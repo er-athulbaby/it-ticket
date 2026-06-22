@@ -24,11 +24,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   await mkdir(uploadDir, { recursive: true });
   await writeFile(path.join(uploadDir, filename), Buffer.from(await file.arrayBuffer()));
 
+  const adminId = session?.user?.id ? parseInt(session.user.id) : null;
+
   const attachment = await queryOne(`
     INSERT INTO ticket_attachments (ticket_id, admin_id, filename, original_name, file_size, mime_type)
     VALUES ($1, $2, $3, $4, $5, $6)
     RETURNING *
-  `, [id, parseInt(session.user.id!), filename, file.name, file.size, file.type]);
+  `, [id, adminId, filename, file.name, file.size, file.type]);
 
   return NextResponse.json(attachment, { status: 201 });
 }
