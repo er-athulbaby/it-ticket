@@ -11,11 +11,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   if (!note?.trim()) return NextResponse.json({ error: 'Note is required' }, { status: 400 });
 
+  const adminId = session?.user?.id ? parseInt(session.user.id) : null;
+
   const created = await queryOne(`
     INSERT INTO ticket_notes (ticket_id, admin_id, note)
     VALUES ($1, $2, $3)
     RETURNING *
-  `, [id, parseInt(session.user.id!), note.trim()]);
+  `, [id, adminId, note.trim()]);
 
   return NextResponse.json(created, { status: 201 });
 }

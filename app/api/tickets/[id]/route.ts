@@ -75,18 +75,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     RETURNING *
   `, [title, description, status, priority, category_id, assigned_to, due_date, id]);
 
+  const adminId = session?.user?.id ? parseInt(session.user.id) : null;
+
   if (status && status !== existing.status) {
     await query(`
       INSERT INTO ticket_history (ticket_id, admin_id, action, old_value, new_value)
       VALUES ($1, $2, 'status_changed', $3, $4)
-    `, [id, parseInt(session.user.id!), existing.status, status]);
+    `, [id, adminId, existing.status, status]);
   }
 
   if (assigned_to && assigned_to !== existing.assigned_to) {
     await query(`
       INSERT INTO ticket_history (ticket_id, admin_id, action, new_value)
       VALUES ($1, $2, 'assigned', $3)
-    `, [id, parseInt(session.user.id!), String(assigned_to)]);
+    `, [id, adminId, String(assigned_to)]);
   }
 
   return NextResponse.json(updated);

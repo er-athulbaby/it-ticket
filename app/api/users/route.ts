@@ -62,8 +62,8 @@ export async function DELETE(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { id } = await req.json();
-  const currentId = parseInt(session.user.id!);
-  if (id === currentId) return NextResponse.json({ error: 'Cannot delete yourself' }, { status: 400 });
+  const currentId = session?.user?.id ? parseInt(session.user.id) : null;
+  if (currentId && id === currentId) return NextResponse.json({ error: 'Cannot delete yourself' }, { status: 400 });
 
   await query('DELETE FROM admins WHERE id = $1', [id]);
   return NextResponse.json({ success: true });

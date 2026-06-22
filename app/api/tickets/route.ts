@@ -58,6 +58,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'title, description and priority are required' }, { status: 400 });
   }
 
+  const adminId = session?.user?.id ? parseInt(session.user.id) : null;
+
   const ticket = await queryOne(`
     INSERT INTO tickets (title, description, priority, category_id, assigned_to, created_by, due_date)
     VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -65,14 +67,14 @@ export async function POST(req: NextRequest) {
   `, [
     title, description, priority,
     category_id || null, assigned_to || null,
-    parseInt(session.user.id!),
+    adminId,
     due_date || null,
   ]);
 
   await query(`
     INSERT INTO ticket_history (ticket_id, admin_id, action, new_value)
     VALUES ($1, $2, 'created', $3)
-  `, [ticket!.id as number, parseInt(session.user.id!), 'Ticket created']);
+  `, [ticket!.id as number, adminId, 'Ticket created']);
 
   return NextResponse.json(ticket, { status: 201 });
 }
