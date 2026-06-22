@@ -1,0 +1,37 @@
+{
+  "name": "HelpDesk Ticketing System",
+  "short_name": "HelpDesk",
+  "description": "Internal helpdesk and ticketing system",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4f46e5",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "business"],
+  "shortcuts": [
+    {
+      "name": "New Ticket",
+      "url": "/tickets/new",
+      "description": "Create a new support ticket"
+    },
+    {
+      "name": "All Tickets",
+      "url": "/tickets",
+      "description": "View all tickets"
+    }
+  ]
+}
