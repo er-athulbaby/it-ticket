@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/layout/AppLayout';
-import Image from 'next/image';
 
 export default function SettingsPage() {
   const { data: session } = useSession();
@@ -94,7 +93,8 @@ export default function SettingsPage() {
           <div className="flex items-center gap-4 mb-5 pb-5 border-b border-slate-100">
             <div className="w-16 h-16 rounded-xl border border-slate-200 flex items-center justify-center bg-slate-50 overflow-hidden flex-shrink-0">
               {hasLogo ? (
-                <Image src="/api/settings/logo" alt="Logo" width={64} height={64} className="object-contain" />
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src="/api/settings/logo" alt="Logo" className="w-full h-full object-contain" />
               ) : (
                 <span className="text-2xl text-slate-300">🖼️</span>
               )}

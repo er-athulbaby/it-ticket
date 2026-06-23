@@ -5,8 +5,6 @@ import { usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 import { cn } from '@/lib/utils';
 import { useSettings } from '@/lib/useSettings';
-import Image from 'next/image';
-
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: '◈' },
   { href: '/tickets', label: 'Tickets', icon: '🎫' },
@@ -25,13 +23,8 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
       {/* Logo */}
       <div className="flex items-center gap-3 px-5 py-4 border-b border-indigo-800">
         {settings.logo_filename ? (
-          <Image
-            src="/api/settings/logo"
-            alt="Logo"
-            width={36}
-            height={36}
-            className="rounded-lg object-contain bg-white p-0.5"
-          />
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src="/api/settings/logo" alt="Logo" className="w-9 h-9 rounded-lg object-contain bg-white p-0.5" />
         ) : (
           <div className="w-9 h-9 bg-indigo-400 rounded-lg flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
             {settings.company_name.slice(0, 2).toUpperCase()}
