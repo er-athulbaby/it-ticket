@@ -104,8 +104,9 @@ export default function StaffPage() {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const XLSX = require('xlsx');
     const ws = XLSX.utils.json_to_sheet([
-      { name: 'John Doe', department: 'IT' },
-      { name: 'Jane Smith', department: 'HR' },
+      { name: 'John Doe', department: 'IT', email: 'john.doe@company.com', password: 'password123' },
+      { name: 'Jane Smith', department: 'HR', email: 'jane.smith@company.com', password: 'password123' },
+      { name: 'Bob Wilson', department: 'Finance', email: '', password: '' },
     ]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Staff');
@@ -277,8 +278,9 @@ export default function StaffPage() {
           )}
         </div>
 
-        <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 text-sm text-indigo-800">
-          <strong>Tip:</strong> Click on a staff photo/avatar to upload their photo. Enable <strong>Portal Access</strong> to let them log in and submit tickets.
+        <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 text-sm text-indigo-800 space-y-1">
+          <p><strong>Excel import columns:</strong> <code>name</code> (required), <code>department</code>, <code>email</code>, <code>password</code> — leave email/password blank for staff without portal access.</p>
+          <p><strong>Tip:</strong> Click on a staff avatar to upload their photo. Staff with a <span className="bg-emerald-100 text-emerald-700 px-1 rounded">Portal</span> badge can log in.</p>
         </div>
       </div>
     </AppLayout>
