@@ -18,7 +18,10 @@ export default function StaffPage() {
   const [importResult, setImportResult] = useState<{ name: string; status: string }[] | null>(null);
   const [search, setSearch] = useState('');
   const [form, setForm] = useState({ name: '', department: '', email: '', password: '', portal_access: false });
+  const [photoUploading, setPhotoUploading] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const photoRef = useRef<HTMLInputElement>(null);
+  const [photoTargetId, setPhotoTargetId] = useState<number | null>(null);
 
   async function load() {
     const res = await fetch('/api/staff');
@@ -78,6 +81,25 @@ export default function StaffPage() {
     if (fileRef.current) fileRef.current.value = '';
   }
 
+  function triggerPhotoUpload(staffId: number) {
+    setPhotoTargetId(staffId);
+    photoRef.current?.click();
+  }
+
+  async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !photoTargetId) return;
+    setPhotoUploading(photoTargetId);
+    const fd = new FormData();
+    fd.append('photo', file);
+    fd.append('staffId', String(photoTargetId));
+    await fetch('/api/staff/photo', { method: 'POST', body: fd });
+    setPhotoUploading(null);
+    setPhotoTargetId(null);
+    if (photoRef.current) photoRef.current.value = '';
+    load();
+  }
+
   function downloadTemplate() {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const XLSX = require('xlsx');
@@ -112,6 +134,9 @@ export default function StaffPage() {
             <button onClick={openNew} className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">+ Add Staff</button>
           </div>
         </div>
+
+        {/* Hidden photo input */}
+        <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
 
         {/* Import results */}
         {importResult && (
@@ -209,9 +234,26 @@ export default function StaffPage() {
             <div className="divide-y divide-slate-100">
               {filtered.map((s) => (
                 <div key={s.id} className="flex items-center gap-4 px-5 py-3.5">
-                  <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-semibold text-sm flex-shrink-0">
-                    {s.name.charAt(0).toUpperCase()}
+                  {/* Avatar with photo upload */}
+                  <div className="relative flex-shrink-0 group cursor-pointer" onClick={() => triggerPhotoUpload(s.id)}>
+                    {s.photo_filename ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={`/api/profile/photo?staffId=${s.id}`} alt={s.name}
+                        className="w-10 h-10 rounded-full object-cover border border-slate-200" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-semibold text-sm">
+                        {s.name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <div className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                      {photoUploading === s.id ? (
+                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <span className="text-white text-xs">📷</span>
+                      )}
+                    </div>
                   </div>
+
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-slate-900">{s.name}</span>
@@ -236,7 +278,7 @@ export default function StaffPage() {
         </div>
 
         <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 text-sm text-indigo-800">
-          <strong>Portal Access:</strong> When enabled, staff can log in at the same login page and submit tickets. Staff with a <span className="bg-emerald-100 text-emerald-700 px-1 rounded">Portal</span> badge have login access.
+          <strong>Tip:</strong> Click on a staff photo/avatar to upload their photo. Enable <strong>Portal Access</strong> to let them log in and submit tickets.
         </div>
       </div>
     </AppLayout>
