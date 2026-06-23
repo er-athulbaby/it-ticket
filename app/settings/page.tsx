@@ -7,6 +7,11 @@ import AppLayout from '@/components/layout/AppLayout';
 export default function SettingsPage() {
   const { data: session } = useSession();
 
+  // Admin photo
+  const [photoUrl, setPhotoUrl] = useState('');
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const photoRef = useRef<HTMLInputElement>(null);
+
   // Branding
   const [companyName, setCompanyName] = useState('');
   const [ticketPrefix, setTicketPrefix] = useState('');
@@ -29,6 +34,10 @@ export default function SettingsPage() {
   const [pwdMsg, setPwdMsg] = useState('');
 
   useEffect(() => {
+    const rawId = (session?.user as { id?: string })?.id ?? '';
+    const adminId = rawId.replace('admin_', '');
+    if (adminId) setPhotoUrl(`/api/users/photo?adminId=${adminId}&t=${Date.now()}`);
+
     fetch('/api/settings').then((r) => r.json()).then((d) => {
       setCompanyName(d.company_name || '');
       setTicketPrefix(d.ticket_prefix || 'IT');
@@ -42,6 +51,20 @@ export default function SettingsPage() {
       });
     });
   }, []);
+
+  async function handleAdminPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingPhoto(true);
+    const fd = new FormData(); fd.append('photo', file);
+    const res = await fetch('/api/users/photo', { method: 'POST', body: fd });
+    if (res.ok) {
+      const rawId = (session?.user as { id?: string })?.id ?? '';
+      setPhotoUrl(`/api/users/photo?adminId=${rawId.replace('admin_', '')}&t=${Date.now()}`);
+    }
+    setUploadingPhoto(false);
+    if (photoRef.current) photoRef.current.value = '';
+  }
 
   async function saveBranding(e: React.FormEvent) {
     e.preventDefault();
@@ -221,10 +244,34 @@ export default function SettingsPage() {
           </form>
         </div>
 
-        {/* Change password */}
+        {/* Account */}
         <div className="bg-white border border-slate-200 rounded-xl p-6">
           <h2 className="font-semibold text-slate-900 mb-1">Account</h2>
           <p className="text-sm text-slate-500 mb-4">Signed in as <strong>{session?.user?.email}</strong></p>
+
+          {/* Profile photo */}
+          <div className="flex items-center gap-4 mb-6 pb-6 border-b border-slate-100">
+            <div className="relative">
+              {photoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={photoUrl} alt="Profile"
+                  onError={() => setPhotoUrl('')}
+                  className="w-16 h-16 rounded-full object-cover border-2 border-slate-200" />
+              ) : (
+                <div className="w-16 h-16 rounded-full bg-indigo-100 flex items-center justify-center text-xl font-bold text-indigo-600">
+                  {session?.user?.name?.slice(0, 1).toUpperCase() ?? 'A'}
+                </div>
+              )}
+            </div>
+            <div>
+              <p className="text-sm font-medium text-slate-700 mb-1">{session?.user?.name}</p>
+              <input ref={photoRef} type="file" accept="image/*" onChange={handleAdminPhoto} className="hidden" id="admin-photo" />
+              <label htmlFor="admin-photo" className="cursor-pointer text-sm text-indigo-600 hover:text-indigo-800 font-medium border border-indigo-200 px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors">
+                {uploadingPhoto ? 'Uploading…' : photoUrl ? 'Change Photo' : 'Upload Photo'}
+              </label>
+            </div>
+          </div>
+
           <form onSubmit={changePassword} className="space-y-4">
             <h3 className="text-sm font-semibold text-slate-700">Change Password</h3>
             <div>

@@ -17,7 +17,7 @@ export default function StaffPage() {
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ name: string; status: string }[] | null>(null);
   const [search, setSearch] = useState('');
-  const [form, setForm] = useState({ name: '', department: '', email: '', password: '', portal_access: false });
+  const [form, setForm] = useState({ name: '', department: '', email: '', password: '' });
   const [photoUploading, setPhotoUploading] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const photoRef = useRef<HTMLInputElement>(null);
@@ -33,13 +33,13 @@ export default function StaffPage() {
 
   function openNew() {
     setEditing(null);
-    setForm({ name: '', department: '', email: '', password: '', portal_access: false });
+    setForm({ name: '', department: '', email: '', password: '' });
     setShowForm(true);
   }
 
   function openEdit(s: Staff) {
     setEditing(s);
-    setForm({ name: s.name, department: s.department || '', email: s.email || '', password: '', portal_access: !!s.email });
+    setForm({ name: s.name, department: s.department || '', email: s.email || '', password: '' });
     setShowForm(true);
   }
 
@@ -48,8 +48,8 @@ export default function StaffPage() {
     const payload: Record<string, unknown> = {
       name: form.name,
       department: form.department,
-      email: form.portal_access ? (form.email || null) : null,
-      password: form.portal_access && form.password ? form.password : undefined,
+      email: form.email.trim() || null,
+      password: form.password || undefined,
     };
     if (editing) {
       payload.id = editing.id;
@@ -177,38 +177,26 @@ export default function StaffPage() {
                   <datalist id="dept-list">{departments.map((d) => <option key={d} value={d!} />)}</datalist>
                 </div>
 
-                {/* Portal access toggle */}
-                <div className="border border-slate-200 rounded-lg p-4">
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input type="checkbox" checked={form.portal_access} onChange={(e) => setForm((f) => ({ ...f, portal_access: e.target.checked }))}
-                      className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500" />
-                    <div>
-                      <span className="text-sm font-medium text-slate-800">Enable Staff Portal Access</span>
-                      <p className="text-xs text-slate-500 mt-0.5">Staff can log in to submit and track tickets</p>
-                    </div>
-                  </label>
-
-                  {form.portal_access && (
-                    <div className="mt-4 space-y-3 pl-7">
-                      <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Email (login) <span className="text-red-500">*</span></label>
-                        <input type="email" required={form.portal_access} value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="staff@company.com" />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">
-                          {editing ? 'New Password (leave blank to keep)' : 'Password *'}
-                        </label>
-                        <input type="password" required={!editing && form.portal_access} value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="At least 6 characters" minLength={6} />
-                      </div>
-                    </div>
-                  )}
+                <div className="border-t border-slate-100 pt-4 space-y-3">
+                  <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">Portal Login (optional)</p>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Email</label>
+                    <input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="staff@company.com" />
+                    <p className="text-xs text-slate-400 mt-1">Leave blank if this staff member does not need login access.</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                      {editing ? 'New Password (leave blank to keep)' : 'Password'}
+                    </label>
+                    <input type="password" value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="At least 6 characters" minLength={6} />
+                  </div>
                 </div>
               </div>
 
               <div className="flex gap-3 mt-6">
-                <button onClick={save} disabled={saving || !form.name.trim() || (form.portal_access && !form.email)}
+                <button onClick={save} disabled={saving || !form.name.trim()}
                   className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-medium px-5 py-2.5 rounded-lg text-sm">
                   {saving ? 'Saving…' : 'Save'}
                 </button>
