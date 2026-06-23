@@ -6,7 +6,8 @@ export async function middleware(req: NextRequest) {
 
   const isAuthPage = pathname === '/login';
   const isApiAuth = pathname.startsWith('/api/auth');
-  const isPublic = isAuthPage || isApiAuth;
+  const isPublicApi = pathname === '/api/settings' || pathname === '/api/settings/logo';
+  const isPublic = isAuthPage || isApiAuth || isPublicApi;
 
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
   const isLoggedIn = !!token;
