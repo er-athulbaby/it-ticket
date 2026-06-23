@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -10,6 +11,18 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [companyName, setCompanyName] = useState('HelpDesk');
+  const [hasLogo, setHasLogo] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/settings')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.company_name) setCompanyName(d.company_name);
+        if (d.logo_filename) setHasLogo(true);
+      })
+      .catch(() => {});
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -36,10 +49,20 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-500 rounded-2xl mb-4 shadow-lg">
-            <span className="text-white font-bold text-2xl">HD</span>
-          </div>
-          <h1 className="text-2xl font-bold text-white">HelpDesk</h1>
+          {hasLogo ? (
+            <Image
+              src="/api/settings/logo"
+              alt="Logo"
+              width={64}
+              height={64}
+              className="mx-auto rounded-2xl object-contain bg-white p-1 shadow-lg mb-4"
+            />
+          ) : (
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-500 rounded-2xl mb-4 shadow-lg">
+              <span className="text-white font-bold text-2xl">{companyName.slice(0, 2).toUpperCase()}</span>
+            </div>
+          )}
+          <h1 className="text-2xl font-bold text-white">{companyName}</h1>
           <p className="text-indigo-300 text-sm mt-1">Sign in to your account</p>
         </div>
 

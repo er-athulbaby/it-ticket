@@ -8,21 +8,24 @@ import type { Priority } from '@/lib/utils';
 
 interface Category { id: number; name: string }
 interface Admin { id: number; name: string }
+interface Staff { id: number; name: string; department: string | null }
 
 export default function NewTicketPage() {
   const router = useRouter();
   const [categories, setCategories] = useState<Category[]>([]);
   const [admins, setAdmins] = useState<Admin[]>([]);
+  const [staff, setStaff] = useState<Staff[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [form, setForm] = useState({
     title: '', description: '', priority: 'medium',
-    category_id: '', assigned_to: '', due_date: '',
+    category_id: '', assigned_to: '', due_date: '', requester_id: '',
   });
 
   useEffect(() => {
     fetch('/api/categories').then((r) => r.json()).then(setCategories);
     fetch('/api/users').then((r) => r.json()).then(setAdmins);
+    fetch('/api/staff').then((r) => r.json()).then(setStaff);
   }, []);
 
   function set(field: string, value: string) {
@@ -41,6 +44,7 @@ export default function NewTicketPage() {
         ...form,
         category_id: form.category_id ? parseInt(form.category_id) : null,
         assigned_to: form.assigned_to ? parseInt(form.assigned_to) : null,
+        requester_id: form.requester_id ? parseInt(form.requester_id) : null,
         due_date: form.due_date || null,
       }),
     });
@@ -86,6 +90,31 @@ export default function NewTicketPage() {
                 placeholder="Detailed description of the issue…"
                 className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Requested By *</label>
+              <select
+                required
+                value={form.requester_id}
+                onChange={(e) => set('requester_id', e.target.value)}
+                className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="">— Select requester —</option>
+                {staff.filter(s => s.department).reduce((depts: string[], s) => {
+                  if (!depts.includes(s.department!)) depts.push(s.department!);
+                  return depts;
+                }, []).map(dept => (
+                  <optgroup key={dept} label={dept}>
+                    {staff.filter(s => s.department === dept).map((s) => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </optgroup>
+                ))}
+                {staff.filter(s => !s.department).map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
             </div>
 
             <div className="grid grid-cols-2 gap-4">

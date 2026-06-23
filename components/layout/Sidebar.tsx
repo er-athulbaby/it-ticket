@@ -4,24 +4,40 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 import { cn } from '@/lib/utils';
+import { useSettings } from '@/lib/useSettings';
+import Image from 'next/image';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: '◈' },
   { href: '/tickets', label: 'Tickets', icon: '🎫' },
   { href: '/categories', label: 'Categories', icon: '🏷️' },
+  { href: '/staff', label: 'Staff', icon: '👤' },
   { href: '/users', label: 'Users', icon: '👥' },
   { href: '/settings', label: 'Settings', icon: '⚙️' },
 ];
 
 export default function Sidebar({ onClose }: { onClose?: () => void }) {
   const pathname = usePathname();
+  const settings = useSettings();
 
   return (
     <div className="flex flex-col h-full bg-indigo-900 text-white w-64">
       {/* Logo */}
-      <div className="flex items-center gap-2 px-6 py-5 border-b border-indigo-800">
-        <div className="w-8 h-8 bg-indigo-400 rounded-lg flex items-center justify-center text-white font-bold text-sm">HD</div>
-        <span className="font-semibold text-lg">HelpDesk</span>
+      <div className="flex items-center gap-3 px-5 py-4 border-b border-indigo-800">
+        {settings.logo_filename ? (
+          <Image
+            src="/api/settings/logo"
+            alt="Logo"
+            width={36}
+            height={36}
+            className="rounded-lg object-contain bg-white p-0.5"
+          />
+        ) : (
+          <div className="w-9 h-9 bg-indigo-400 rounded-lg flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+            {settings.company_name.slice(0, 2).toUpperCase()}
+          </div>
+        )}
+        <span className="font-semibold text-base leading-tight truncate">{settings.company_name}</span>
       </div>
 
       {/* Nav */}

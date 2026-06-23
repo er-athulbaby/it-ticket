@@ -20,6 +20,11 @@ export async function GET(req: NextRequest) {
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
+  const settingsRows = await query<{ key: string; value: string }>(
+    `SELECT key, value FROM app_settings WHERE key = 'company_name'`
+  );
+  const companyName = settingsRows[0]?.value || 'HelpDesk';
+
   const tickets = await query(`
     SELECT
       t.ticket_number AS "Ticket #",
@@ -28,6 +33,8 @@ export async function GET(req: NextRequest) {
       t.status AS "Status",
       t.priority AS "Priority",
       c.name AS "Category",
+      s.name AS "Requested By",
+      s.department AS "Department",
       a.name AS "Assigned To",
       cr.name AS "Created By",
       t.due_date AS "Due Date",
@@ -37,15 +44,24 @@ export async function GET(req: NextRequest) {
       t.closed_at AS "Closed At"
     FROM tickets t
     LEFT JOIN categories c ON t.category_id = c.id
+    LEFT JOIN staff s ON t.requester_id = s.id
     LEFT JOIN admins a ON t.assigned_to = a.id
     LEFT JOIN admins cr ON t.created_by = cr.id
     ${where}
     ORDER BY t.created_at DESC
   `, params);
 
-  const ws = XLSX.utils.json_to_sheet(tickets);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Tickets');
+
+  // Header sheet with company name and export date
+  const headerData = [
+    [companyName],
+    [`Ticket Report — Exported on ${new Date().toLocaleDateString('en-IN')}`],
+    [],
+  ];
+  const headerWs = XLSX.utils.aoa_to_sheet(headerData);
+  XLSX.utils.sheet_add_json(headerWs, tickets, { origin: 'A4' });
+  XLSX.utils.book_append_sheet(wb, headerWs, 'Tickets');
 
   const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
 

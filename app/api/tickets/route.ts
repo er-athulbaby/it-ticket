@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await req.json();
-  const { title, description, priority, category_id, assigned_to, due_date } = body;
+  const { title, description, priority, category_id, assigned_to, due_date, requester_id } = body;
 
   if (!title || !description || !priority) {
     return NextResponse.json({ error: 'title, description and priority are required' }, { status: 400 });
@@ -60,15 +60,29 @@ export async function POST(req: NextRequest) {
 
   const adminId = session?.user?.id ? parseInt(session.user.id) : null;
 
+  // Generate ticket number from settings
+  const settingsRows = await query<{ key: string; value: string }>(
+    `SELECT key, value FROM app_settings WHERE key IN ('ticket_prefix', 'ticket_counter')`
+  );
+  const settings: Record<string, string> = {};
+  settingsRows.forEach((r) => { settings[r.key] = r.value; });
+  const prefix = settings['ticket_prefix'] || 'IT';
+  const nextCounter = (parseInt(settings['ticket_counter'] || '0') + 1);
+  await query(
+    `UPDATE app_settings SET value = $1 WHERE key = 'ticket_counter'`,
+    [String(nextCounter)]
+  );
+  const ticketNumber = `${prefix}-${String(nextCounter).padStart(5, '0')}`;
+
   const ticket = await queryOne(`
-    INSERT INTO tickets (title, description, priority, category_id, assigned_to, created_by, due_date)
-    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    INSERT INTO tickets (ticket_number, title, description, priority, category_id, assigned_to, created_by, due_date, requester_id)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     RETURNING *
   `, [
-    title, description, priority,
+    ticketNumber, title, description, priority,
     category_id || null, assigned_to || null,
-    adminId,
-    due_date || null,
+    adminId, due_date || null,
+    requester_id || null,
   ]);
 
   await query(`

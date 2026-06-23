@@ -14,6 +14,7 @@ interface Ticket {
   status: string; priority: string; category_id: number | null; assigned_to: number | null;
   due_date: string | null; created_at: string; updated_at: string;
   category_name: string | null; assigned_name: string | null; creator_name: string | null;
+  requester_name: string | null; requester_department: string | null;
 }
 interface Note { id: number; note: string; admin_name: string; created_at: string }
 interface Attachment {
@@ -265,6 +266,16 @@ export default function TicketDetailPage() {
               <div>
                 <div className="text-xs text-slate-400 mb-0.5">Assigned To</div>
                 <div className="text-sm text-slate-700">{ticket.assigned_name ?? 'Unassigned'}</div>
+              </div>
+
+              <div>
+                <div className="text-xs text-slate-400 mb-0.5">Requested By</div>
+                <div className="text-sm text-slate-700">
+                  {ticket.requester_name ?? '—'}
+                  {ticket.requester_department && (
+                    <span className="text-xs text-slate-400 ml-1">({ticket.requester_department})</span>
+                  )}
+                </div>
               </div>
 
               <div>

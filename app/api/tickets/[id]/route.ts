@@ -10,11 +10,12 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
   const ticket = await queryOne(`
     SELECT t.*, c.name AS category_name, a.name AS assigned_name,
-           cr.name AS creator_name
+           cr.name AS creator_name, s.name AS requester_name, s.department AS requester_department
     FROM tickets t
     LEFT JOIN categories c ON t.category_id = c.id
     LEFT JOIN admins a ON t.assigned_to = a.id
     LEFT JOIN admins cr ON t.created_by = cr.id
+    LEFT JOIN staff s ON t.requester_id = s.id
     WHERE t.id = $1
   `, [id]);
 
