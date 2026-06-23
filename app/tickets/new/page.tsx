@@ -71,7 +71,7 @@ export default function NewTicketPage() {
         <div className="bg-white border border-slate-200 rounded-xl p-6">
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Title *</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Title <span className="text-red-500">*</span></label>
               <input
                 type="text" required
                 value={form.title}
@@ -82,18 +82,18 @@ export default function NewTicketPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Description *</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Description</label>
               <textarea
-                required rows={5}
+                rows={4}
                 value={form.description}
                 onChange={(e) => set('description', e.target.value)}
-                placeholder="Detailed description of the issue…"
+                placeholder="Detailed description of the issue (optional)…"
                 className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Requested By *</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Requested By <span className="text-red-500">*</span></label>
               <select
                 required
                 value={form.requester_id}
@@ -119,7 +119,7 @@ export default function NewTicketPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Priority *</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Priority <span className="text-red-500">*</span></label>
                 <select
                   value={form.priority}
                   onChange={(e) => set('priority', e.target.value)}

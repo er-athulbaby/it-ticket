@@ -31,10 +31,12 @@ export async function GET(req: NextRequest) {
 
   const tickets = await query(`
     SELECT t.id, t.ticket_number, t.title, t.status, t.priority, t.created_at, t.updated_at, t.due_date,
-           c.name AS category_name, a.name AS assigned_name
+           c.name AS category_name, a.name AS assigned_name,
+           s.name AS requester_name, s.department AS requester_department
     FROM tickets t
     LEFT JOIN categories c ON t.category_id = c.id
     LEFT JOIN admins a ON t.assigned_to = a.id
+    LEFT JOIN staff s ON t.requester_id = s.id
     ${where}
     ORDER BY t.created_at DESC
     LIMIT $${p++} OFFSET $${p++}
@@ -54,8 +56,8 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { title, description, priority, category_id, assigned_to, due_date, requester_id } = body;
 
-  if (!title || !description || !priority) {
-    return NextResponse.json({ error: 'title, description and priority are required' }, { status: 400 });
+  if (!title || !priority) {
+    return NextResponse.json({ error: 'title and priority are required' }, { status: 400 });
   }
 
   const adminId = session?.user?.id ? parseInt(session.user.id) : null;

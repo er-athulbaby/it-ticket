@@ -10,6 +10,7 @@ interface Ticket {
   id: number; ticket_number: string; title: string; status: string;
   priority: string; created_at: string; due_date: string | null;
   category_name: string | null; assigned_name: string | null;
+  requester_name: string | null; requester_department: string | null;
 }
 
 const STATUSES = ['', 'open', 'in_progress', 'resolved', 'closed'];
@@ -121,6 +122,7 @@ export default function TicketsPage() {
                       <div className="min-w-0">
                         <div className="text-xs text-slate-400 font-mono">{t.ticket_number}</div>
                         <div className="text-sm font-medium text-slate-900 truncate">{t.title}</div>
+                        {t.requester_name && <div className="text-xs text-indigo-600 mt-0.5">Requested by {t.requester_name}</div>}
                         <div className="text-xs text-slate-500 mt-0.5">{formatDateTime(t.created_at)}</div>
                       </div>
                       <div className="flex flex-col items-end gap-1 flex-shrink-0">
@@ -142,6 +144,7 @@ export default function TicketsPage() {
                   <tr>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Ticket #</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Title</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Requested By</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Priority</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Category</th>
@@ -160,6 +163,7 @@ export default function TicketsPage() {
                           {t.title}
                         </Link>
                       </td>
+                      <td className="px-4 py-3 text-slate-600">{t.requester_name ?? '—'}</td>
                       <td className="px-4 py-3">
                         <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_COLORS[t.status as Status]}`}>
                           {STATUS_LABELS[t.status as Status]}
