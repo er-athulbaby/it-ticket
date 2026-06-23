@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { query, queryOne } from '@/lib/db';
+import { sendNewTicketEmail } from '@/lib/email';
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -60,7 +61,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'title and priority are required' }, { status: 400 });
   }
 
-  const adminId = session?.user?.id ? parseInt(session.user.id) : null;
+  const rawSid = session?.user?.id ?? '';
+  const adminId = rawSid ? parseInt(rawSid.replace('admin_', '')) : null;
 
   // Generate ticket number from settings
   const settingsRows = await query<{ key: string; value: string }>(
@@ -91,6 +93,19 @@ export async function POST(req: NextRequest) {
     INSERT INTO ticket_history (ticket_id, admin_id, action, new_value)
     VALUES ($1, $2, 'created', $3)
   `, [ticket!.id as number, adminId, 'Ticket created']);
+
+  // Send email notification (non-blocking)
+  const requester = requester_id
+    ? await queryOne<{ name: string }>('SELECT name FROM staff WHERE id = $1', [requester_id])
+    : null;
+  const cat = category_id
+    ? await queryOne<{ name: string }>('SELECT name FROM categories WHERE id = $1', [category_id])
+    : null;
+  sendNewTicketEmail({
+    ticket_number: ticketNumber, title, priority,
+    requester_name: requester?.name ?? null,
+    category_name: cat?.name ?? null,
+  }).catch(() => {});
 
   return NextResponse.json(ticket, { status: 201 });
 }

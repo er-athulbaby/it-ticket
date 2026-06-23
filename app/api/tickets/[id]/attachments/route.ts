@@ -24,7 +24,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   await mkdir(uploadDir, { recursive: true });
   await writeFile(path.join(uploadDir, filename), Buffer.from(await file.arrayBuffer()));
 
-  const adminId = session?.user?.id ? parseInt(session.user.id) : null;
+  const rawSid = session?.user?.id ?? '';
+  const adminId = rawSid ? parseInt(rawSid.replace('admin_', '')) : null;
 
   const attachment = await queryOne(`
     INSERT INTO ticket_attachments (ticket_id, admin_id, filename, original_name, file_size, mime_type)

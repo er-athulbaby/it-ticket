@@ -76,7 +76,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     RETURNING *
   `, [title, description, status, priority, category_id, assigned_to, due_date, id]);
 
-  const adminId = session?.user?.id ? parseInt(session.user.id) : null;
+  const rawSid = session?.user?.id ?? '';
+  const adminId = rawSid ? parseInt(rawSid.replace('admin_', '')) : null;
 
   if (status && status !== existing.status) {
     await query(`

@@ -11,7 +11,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   if (!note?.trim()) return NextResponse.json({ error: 'Note is required' }, { status: 400 });
 
-  const adminId = session?.user?.id ? parseInt(session.user.id) : null;
+  const rawSid = session?.user?.id ?? '';
+  const adminId = rawSid ? parseInt(rawSid.replace('admin_', '')) : null;
 
   const created = await queryOne(`
     INSERT INTO ticket_notes (ticket_id, admin_id, note)
