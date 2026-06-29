@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import AppLayout from '@/components/layout/AppLayout';
 import { STATUS_COLORS, STATUS_LABELS, PRIORITY_COLORS, PRIORITY_LABELS, formatDateTime } from '@/lib/utils';
@@ -17,12 +18,17 @@ const STATUSES = ['', 'open', 'in_progress', 'resolved', 'closed'];
 const PRIORITIES = ['', 'low', 'medium', 'high', 'critical'];
 
 export default function TicketsPage() {
+  return <Suspense><TicketsInner /></Suspense>;
+}
+
+function TicketsInner() {
+  const searchParams = useSearchParams();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useState(() => searchParams.get('status') ?? '');
   const [priority, setPriority] = useState('');
 
   const fetchTickets = useCallback(async () => {
