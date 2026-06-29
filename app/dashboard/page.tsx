@@ -16,10 +16,10 @@ interface RecentTicket {
 }
 
 const statCards = [
-  { key: 'total', label: 'Total Tickets', bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200' },
-  { key: 'open', label: 'Open', bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-200' },
-  { key: 'in_progress', label: 'In Progress', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
-  { key: 'resolved', label: 'Resolved', bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200' },
+  { key: 'total',       label: 'Total Tickets', bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200', filter: '' },
+  { key: 'open',        label: 'Open',          bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-200', filter: 'open' },
+  { key: 'in_progress', label: 'In Progress',   bg: 'bg-blue-50',   text: 'text-blue-700',   border: 'border-blue-200',   filter: 'in_progress' },
+  { key: 'resolved',    label: 'Resolved',      bg: 'bg-green-50',  text: 'text-green-700',  border: 'border-green-200',  filter: 'resolved' },
 ];
 
 export default function DashboardPage() {
@@ -64,12 +64,17 @@ export default function DashboardPage() {
         {/* Stat cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {statCards.map((card) => (
-            <div key={card.key} className={`${card.bg} border ${card.border} rounded-xl p-4`}>
+            <Link
+              key={card.key}
+              href={card.filter ? `/tickets?status=${card.filter}` : '/tickets'}
+              className={`${card.bg} border ${card.border} rounded-xl p-4 hover:shadow-md hover:scale-[1.02] transition-all`}
+            >
               <div className={`text-3xl font-bold ${card.text}`}>
                 {stats?.[card.key as keyof Stats] ?? 0}
               </div>
               <div className="text-sm text-slate-600 mt-0.5">{card.label}</div>
-            </div>
+              <div className={`text-xs mt-2 ${card.text} opacity-70`}>View →</div>
+            </Link>
           ))}
         </div>
 

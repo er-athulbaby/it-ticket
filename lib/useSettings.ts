@@ -7,6 +7,7 @@ export interface AppSettings {
   ticket_prefix: string;
   ticket_counter: string;
   logo_filename: string;
+  theme: string;
 }
 
 const DEFAULT: AppSettings = {
@@ -14,6 +15,7 @@ const DEFAULT: AppSettings = {
   ticket_prefix: 'IT',
   ticket_counter: '0',
   logo_filename: '',
+  theme: 'indigo',
 };
 
 export function useSettings() {

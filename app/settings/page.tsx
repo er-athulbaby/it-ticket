@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/layout/AppLayout';
+import { THEMES, type ThemeKey } from '@/lib/themes';
 
 export default function SettingsPage() {
   const { data: session } = useSession();
@@ -11,6 +12,10 @@ export default function SettingsPage() {
   const [photoUrl, setPhotoUrl] = useState('');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const photoRef = useRef<HTMLInputElement>(null);
+
+  // Theme
+  const [theme, setTheme] = useState<ThemeKey>('indigo');
+  const [savingTheme, setSavingTheme] = useState(false);
 
   // Branding
   const [companyName, setCompanyName] = useState('');
@@ -42,6 +47,7 @@ export default function SettingsPage() {
       setCompanyName(d.company_name || '');
       setTicketPrefix(d.ticket_prefix || 'IT');
       setHasLogo(!!d.logo_filename);
+      if (d.theme) setTheme(d.theme as ThemeKey);
       setSmtp({
         notification_email: d.notification_email || '',
         smtp_host: d.smtp_host || 'smtp-mail.outlook.com',
@@ -64,6 +70,17 @@ export default function SettingsPage() {
     }
     setUploadingPhoto(false);
     if (photoRef.current) photoRef.current.value = '';
+  }
+
+  async function saveTheme(t: ThemeKey) {
+    setTheme(t);
+    setSavingTheme(true);
+    await fetch('/api/settings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ theme: t }),
+    });
+    setSavingTheme(false);
   }
 
   async function saveBranding(e: React.FormEvent) {
@@ -135,6 +152,23 @@ export default function SettingsPage() {
     <AppLayout>
       <div className="max-w-xl mx-auto space-y-6">
         <h1 className="text-2xl font-bold text-slate-900">Settings</h1>
+
+        {/* Theme */}
+        <div className="bg-white border border-slate-200 rounded-xl p-6">
+          <h2 className="font-semibold text-slate-900 mb-1">Site Theme</h2>
+          <p className="text-sm text-slate-500 mb-4">Choose the colour scheme for the sidebar and buttons. {savingTheme && <span className="text-indigo-600">Saving…</span>}</p>
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+            {(Object.keys(THEMES) as ThemeKey[]).map((key) => (
+              <button key={key} onClick={() => saveTheme(key)}
+                className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${theme === key ? 'border-slate-900 shadow-md scale-105' : 'border-slate-200 hover:border-slate-400'}`}>
+                <div className="w-10 h-10 rounded-full shadow-inner" style={{ backgroundColor: THEMES[key].preview }} />
+                <span className="text-xs font-medium text-slate-700">{THEMES[key].label}</span>
+                {theme === key && <span className="text-xs text-slate-500">✓</span>}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-slate-400 mt-3">Reload the page after changing to see the new theme in the sidebar.</p>
+        </div>
 
         {/* Branding */}
         <div className="bg-white border border-slate-200 rounded-xl p-6">
