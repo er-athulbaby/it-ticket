@@ -10,6 +10,15 @@ async function getSmtpSettings() {
   return s;
 }
 
+function createTransport(s: Record<string, string>) {
+  return nodemailer.createTransport({
+    host: s.smtp_host || 'smtp.gmail.com',
+    port: parseInt(s.smtp_port || '587'),
+    secure: false,
+    auth: { user: s.smtp_user, pass: s.smtp_pass },
+  });
+}
+
 export async function sendNewTicketEmail(ticket: {
   ticket_number: string;
   title: string;
@@ -20,14 +29,7 @@ export async function sendNewTicketEmail(ticket: {
   const s = await getSmtpSettings();
   if (!s.smtp_user || !s.smtp_pass || !s.notification_email) return;
 
-  const transporter = nodemailer.createTransport({
-    host: s.smtp_host || 'smtp-mail.outlook.com',
-    port: parseInt(s.smtp_port || '587'),
-    secure: false,
-    auth: { user: s.smtp_user, pass: s.smtp_pass },
-    tls: { ciphers: 'SSLv3' },
-  });
-
+  const transporter = createTransport(s);
   const company = s.company_name || 'HelpDesk';
 
   await transporter.sendMail({
@@ -48,6 +50,59 @@ export async function sendNewTicketEmail(ticket: {
             <tr><td style="padding:6px 0;color:#64748b;font-size:13px;">Category</td><td style="padding:6px 0;color:#1e293b;">${ticket.category_name || '—'}</td></tr>
           </table>
           <p style="margin-top:20px;font-size:13px;color:#64748b;">Login to your HelpDesk to view and respond to this ticket.</p>
+        </div>
+      </div>
+    `,
+  });
+}
+
+interface ReminderTicket {
+  ticket_number: string;
+  title: string;
+  status: string;
+  priority: string;
+  notification_frequency: string;
+}
+
+export async function sendReminderEmail(tickets: ReminderTicket[]) {
+  const s = await getSmtpSettings();
+  if (!s.smtp_user || !s.smtp_pass || !s.notification_email) return;
+
+  const transporter = createTransport(s);
+  const company = s.company_name || 'HelpDesk';
+
+  const rows = tickets.map((t) => `
+    <tr>
+      <td style="padding:8px 10px;border-bottom:1px solid #f1f5f9;font-family:monospace;font-size:12px;color:#64748b;">${t.ticket_number}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #f1f5f9;font-size:13px;color:#1e293b;">${t.title}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #f1f5f9;font-size:13px;color:#1e293b;text-transform:capitalize;">${t.priority}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #f1f5f9;font-size:12px;color:#64748b;text-transform:capitalize;">${t.status.replace(/_/g, ' ')}</td>
+    </tr>
+  `).join('');
+
+  await transporter.sendMail({
+    from: `"${company}" <${s.smtp_user}>`,
+    to: s.notification_email,
+    subject: `[${company}] Reminder: ${tickets.length} unresolved ticket${tickets.length > 1 ? 's' : ''}`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;">
+        <div style="background:#4f46e5;padding:20px 24px;border-radius:8px 8px 0 0;">
+          <h2 style="color:white;margin:0;font-size:18px;">${company} — Ticket Reminder</h2>
+        </div>
+        <div style="border:1px solid #e2e8f0;border-top:none;padding:24px;border-radius:0 0 8px 8px;">
+          <p style="margin:0 0 16px;font-size:14px;color:#374151;">The following <strong>${tickets.length} ticket${tickets.length > 1 ? 's' : ''}</strong> still need attention:</p>
+          <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;">
+            <thead>
+              <tr style="background:#f8fafc;">
+                <th style="padding:8px 10px;text-align:left;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;">Ticket #</th>
+                <th style="padding:8px 10px;text-align:left;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;">Title</th>
+                <th style="padding:8px 10px;text-align:left;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;">Priority</th>
+                <th style="padding:8px 10px;text-align:left;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;">Status</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+          <p style="margin-top:20px;font-size:13px;color:#64748b;">Login to your HelpDesk to update or resolve these tickets.</p>
         </div>
       </div>
     `,

@@ -74,10 +74,17 @@ export default function SettingsPage() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
 
   // Email / SMTP
-  const [smtp, setSmtp] = useState({ notification_email: '', smtp_host: 'smtp-mail.outlook.com', smtp_port: '587', smtp_user: '', smtp_pass: '' });
+  const [smtp, setSmtp] = useState({ notification_email: '', smtp_host: 'smtp.gmail.com', smtp_port: '587', smtp_user: '', smtp_pass: '' });
   const [savingSmtp, setSavingSmtp] = useState(false);
   const [smtpMsg, setSmtpMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [testing, setTesting] = useState(false);
+
+  // Reminders
+  const [reminderTime1, setReminderTime1] = useState('09:00');
+  const [reminderTime2, setReminderTime2] = useState('15:00');
+  const [reminderSecret, setReminderSecret] = useState('');
+  const [savingReminder, setSavingReminder] = useState(false);
+  const [reminderMsg, setReminderMsg] = useState('');
 
   // Password
   const [password, setPassword] = useState('');
@@ -97,11 +104,14 @@ export default function SettingsPage() {
       if (d.theme) setTheme(d.theme as ThemeKey);
       setSmtp({
         notification_email: d.notification_email || '',
-        smtp_host: d.smtp_host || 'smtp-mail.outlook.com',
+        smtp_host: d.smtp_host || 'smtp.gmail.com',
         smtp_port: d.smtp_port || '587',
         smtp_user: d.smtp_user || '',
         smtp_pass: d.smtp_pass || '',
       });
+      if (d.reminder_time_1) setReminderTime1(d.reminder_time_1);
+      if (d.reminder_time_2) setReminderTime2(d.reminder_time_2);
+      if (d.reminder_secret) setReminderSecret(d.reminder_secret);
     });
   }, []);
 
@@ -164,6 +174,29 @@ export default function SettingsPage() {
     });
     setSavingSmtp(false);
     setSmtpMsg({ type: 'success', text: 'Email settings saved' });
+  }
+
+  async function saveReminder(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingReminder(true);
+    await fetch('/api/settings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reminder_time_1: reminderTime1, reminder_time_2: reminderTime2 }),
+    });
+    setSavingReminder(false);
+    setReminderMsg('Saved');
+    setTimeout(() => setReminderMsg(''), 3000);
+  }
+
+  async function generateSecret() {
+    const secret = crypto.randomUUID().replace(/-/g, '');
+    setReminderSecret(secret);
+    await fetch('/api/settings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reminder_secret: secret }),
+    });
   }
 
   async function testEmail() {
@@ -337,7 +370,14 @@ export default function SettingsPage() {
         {/* Email / SMTP */}
         <div className="bg-white border border-slate-200 rounded-xl p-6">
           <h2 className="font-semibold text-slate-900 mb-1">Email Notifications</h2>
-          <p className="text-sm text-slate-500 mb-4">Sends an email when a new ticket is submitted. Uses Outlook / Microsoft 365 SMTP.</p>
+          <p className="text-sm text-slate-500 mb-4">Sends an email when a new ticket is submitted. Uses Gmail SMTP with an App Password.</p>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 mb-4 text-xs text-blue-800 space-y-1">
+            <p className="font-semibold">How to set up Gmail:</p>
+            <p>1. Enable 2-Step Verification on your Google account</p>
+            <p>2. Go to Google Account → Security → App Passwords</p>
+            <p>3. Create an app password for "Mail" — paste it in the password field below</p>
+          </div>
 
           <form onSubmit={saveSmtp} className="space-y-4">
             <div>
@@ -345,13 +385,14 @@ export default function SettingsPage() {
               <input type="email" value={smtp.notification_email} onChange={(e) => setSmtp((s) => ({ ...s, notification_email: e.target.value }))}
                 placeholder="admin@company.com"
                 className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-              <p className="text-xs text-slate-400 mt-1">New ticket alerts will be sent to this address.</p>
+              <p className="text-xs text-slate-400 mt-1">New ticket alerts and reminders will be sent to this address.</p>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2 sm:col-span-1">
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">SMTP Host</label>
                 <input type="text" value={smtp.smtp_host} onChange={(e) => setSmtp((s) => ({ ...s, smtp_host: e.target.value }))}
+                  placeholder="smtp.gmail.com"
                   className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               </div>
               <div className="col-span-2 sm:col-span-1">
@@ -362,18 +403,18 @@ export default function SettingsPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Microsoft 365 Email (sender)</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Gmail Address (sender)</label>
               <input type="email" value={smtp.smtp_user} onChange={(e) => setSmtp((s) => ({ ...s, smtp_user: e.target.value }))}
-                placeholder="helpdesk@company.com"
+                placeholder="yourname@gmail.com"
                 className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Email Password</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">App Password</label>
               <input type="password" value={smtp.smtp_pass} onChange={(e) => setSmtp((s) => ({ ...s, smtp_pass: e.target.value }))}
-                placeholder="Your Microsoft 365 account password"
+                placeholder="Google App Password (16 characters)"
                 className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-              <p className="text-xs text-slate-400 mt-1">For Microsoft 365, use your account password. Basic auth must be enabled by your admin.</p>
+              <p className="text-xs text-slate-400 mt-1">Use the App Password generated from Google Account → Security. Not your regular Gmail password.</p>
             </div>
 
             {smtpMsg && (
@@ -393,6 +434,62 @@ export default function SettingsPage() {
               </button>
             </div>
           </form>
+        </div>
+
+        {/* Reminder Schedule */}
+        <div className="bg-white border border-slate-200 rounded-xl p-6">
+          <h2 className="font-semibold text-slate-900 mb-1">Reminder Schedule</h2>
+          <p className="text-sm text-slate-500 mb-4">Set the times when reminder emails are sent for unresolved tickets. Times are in UTC.</p>
+
+          <form onSubmit={saveReminder} className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">First reminder time (UTC)</label>
+                <input type="time" value={reminderTime1} onChange={(e) => setReminderTime1(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Second reminder time (UTC)</label>
+                <input type="time" value={reminderTime2} onChange={(e) => setReminderTime2(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                <p className="text-xs text-slate-400 mt-1">Used for &quot;Twice daily&quot; tickets only.</p>
+              </div>
+            </div>
+            {reminderMsg && <p className="text-sm text-green-600">{reminderMsg}</p>}
+            <button type="submit" disabled={savingReminder}
+              className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-medium px-5 py-2.5 rounded-lg text-sm transition-colors">
+              {savingReminder ? 'Saving…' : 'Save Times'}
+            </button>
+          </form>
+
+          <div className="mt-5 pt-5 border-t border-slate-100">
+            <p className="text-sm font-medium text-slate-700 mb-2">Cron Secret Token</p>
+            <p className="text-xs text-slate-500 mb-3">A secret token protects the reminder endpoint so only your cron job can trigger it.</p>
+            <div className="flex gap-2 items-center mb-3">
+              <input readOnly value={reminderSecret || '(not generated yet)'}
+                className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-xs font-mono bg-slate-50 text-slate-600 truncate" />
+              <button type="button" onClick={() => { if (reminderSecret) { navigator.clipboard.writeText(reminderSecret); } }}
+                disabled={!reminderSecret}
+                className="border border-slate-300 text-slate-600 text-xs px-3 py-2 rounded-lg hover:bg-slate-50 disabled:opacity-40 transition-colors">
+                Copy
+              </button>
+              <button type="button" onClick={generateSecret}
+                className="border border-indigo-300 text-indigo-600 text-xs px-3 py-2 rounded-lg hover:bg-indigo-50 transition-colors">
+                {reminderSecret ? 'Regenerate' : 'Generate'}
+              </button>
+            </div>
+
+            {reminderSecret && (
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-2">
+                <p className="text-xs font-semibold text-slate-700">Server cron setup (run on your Ubuntu server):</p>
+                <p className="text-xs text-slate-500">Run <code className="bg-white border border-slate-200 px-1 rounded">crontab -e</code> and add this line:</p>
+                <code className="block text-xs bg-white border border-slate-200 rounded px-3 py-2 text-slate-700 break-all">
+                  {`*/15 * * * * curl -s "http://localhost:3000/api/reminders/send?secret=${reminderSecret}" >> /var/log/helpdesk-reminders.log 2>&1`}
+                </code>
+                <p className="text-xs text-slate-400">This runs every 15 minutes. Emails only send when the current time (UTC) is within 15 minutes of your configured reminder times above.</p>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Account */}

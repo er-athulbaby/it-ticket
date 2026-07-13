@@ -14,6 +14,7 @@ interface Ticket {
   category_name: string | null; assigned_name: string | null; creator_name: string | null;
   requester_id: number | null; requester_name: string | null; requester_department: string | null;
   association_id: number | null; association_name: string | null;
+  notification_frequency: string;
 }
 interface Note { id: number; note: string; admin_name: string; created_at: string }
 interface Attachment { id: number; filename: string; original_name: string; file_size: number; mime_type: string; created_at: string; admin_name: string; }
@@ -375,6 +376,29 @@ export default function TicketDetailPage() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Notification frequency */}
+            <div className="bg-white border border-slate-200 rounded-xl p-4">
+              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Reminder Alerts</h3>
+              <select
+                value={ticket.notification_frequency}
+                onChange={async (e) => {
+                  const freq = e.target.value;
+                  setTicket((t) => t ? { ...t, notification_frequency: freq } : t);
+                  await fetch(`/api/tickets/${id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ notification_frequency: freq }),
+                  });
+                }}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="none">No reminders</option>
+                <option value="once_daily">Once daily</option>
+                <option value="twice_daily">Twice daily</option>
+              </select>
+              <p className="text-xs text-slate-400 mt-2">Sends a reminder email to the helpdesk team until this ticket is resolved.</p>
             </div>
 
             {/* Details */}

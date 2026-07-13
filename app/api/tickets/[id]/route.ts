@@ -76,6 +76,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if ('assigned_to' in body) set('assigned_to', body.assigned_to ?? null);
   if ('due_date' in body) set('due_date', body.due_date ?? null);
   if ('requester_id' in body) set('requester_id', body.requester_id ?? null);
+  if ('association_id' in body) set('association_id', body.association_id ?? null);
+  if ('notification_frequency' in body) set('notification_frequency', body.notification_frequency);
   if ('status' in body) {
     set('status', body.status);
     if (body.status === 'resolved') setClauses.push(`resolved_at = CASE WHEN status != 'resolved' THEN NOW() ELSE resolved_at END`);
