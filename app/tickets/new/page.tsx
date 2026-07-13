@@ -9,28 +9,45 @@ import type { Priority } from '@/lib/utils';
 interface Category { id: number; name: string }
 interface Admin { id: number; name: string }
 interface Staff { id: number; name: string; department: string | null }
+interface Association { id: number; name: string }
 
 export default function NewTicketPage() {
   const router = useRouter();
   const [categories, setCategories] = useState<Category[]>([]);
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
+  const [associations, setAssociations] = useState<Association[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [requesterType, setRequesterType] = useState<'staff' | 'association'>('staff');
   const [form, setForm] = useState({
     title: '', description: '', priority: 'medium',
-    category_id: '', assigned_to: '', due_date: '', requester_id: '',
+    category_id: '', assigned_to: '', due_date: '',
+    requester_id: '', association_id: '',
   });
 
   useEffect(() => {
     fetch('/api/categories').then((r) => r.json()).then(setCategories);
     fetch('/api/users').then((r) => r.json()).then(setAdmins);
     fetch('/api/staff').then((r) => r.json()).then(setStaff);
+    fetch('/api/associations').then((r) => r.json()).then(setAssociations);
   }, []);
 
   function set(field: string, value: string) {
     setForm((f) => ({ ...f, [field]: value }));
   }
+
+  function switchRequesterType(type: 'staff' | 'association') {
+    setRequesterType(type);
+    setForm((f) => ({ ...f, requester_id: '', association_id: '' }));
+  }
+
+  const deptGroups = staff.reduce<Record<string, Staff[]>>((acc, s) => {
+    const dept = s.department || 'Other';
+    if (!acc[dept]) acc[dept] = [];
+    acc[dept].push(s);
+    return acc;
+  }, {});
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -41,11 +58,14 @@ export default function NewTicketPage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        ...form,
+        title: form.title,
+        description: form.description,
+        priority: form.priority,
         category_id: form.category_id ? parseInt(form.category_id) : null,
         assigned_to: form.assigned_to ? parseInt(form.assigned_to) : null,
-        requester_id: form.requester_id ? parseInt(form.requester_id) : null,
         due_date: form.due_date || null,
+        requester_id: requesterType === 'staff' && form.requester_id ? parseInt(form.requester_id) : null,
+        association_id: requesterType === 'association' && form.association_id ? parseInt(form.association_id) : null,
       }),
     });
 
@@ -92,29 +112,45 @@ export default function NewTicketPage() {
               />
             </div>
 
+            {/* Requested By */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Requested By <span className="text-red-500">*</span></label>
-              <select
-                required
-                value={form.requester_id}
-                onChange={(e) => set('requester_id', e.target.value)}
-                className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                <option value="">— Select requester —</option>
-                {staff.filter(s => s.department).reduce((depts: string[], s) => {
-                  if (!depts.includes(s.department!)) depts.push(s.department!);
-                  return depts;
-                }, []).map(dept => (
-                  <optgroup key={dept} label={dept}>
-                    {staff.filter(s => s.department === dept).map((s) => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
-                    ))}
-                  </optgroup>
-                ))}
-                {staff.filter(s => !s.department).map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Requested By</label>
+              <div className="flex rounded-lg border border-slate-300 overflow-hidden mb-3 w-fit">
+                <button type="button"
+                  onClick={() => switchRequesterType('staff')}
+                  className={`px-4 py-1.5 text-sm font-medium transition-colors ${requesterType === 'staff' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>
+                  Staff
+                </button>
+                <button type="button"
+                  onClick={() => switchRequesterType('association')}
+                  className={`px-4 py-1.5 text-sm font-medium transition-colors border-l border-slate-300 ${requesterType === 'association' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>
+                  Association / Federation
+                </button>
+              </div>
+
+              {requesterType === 'staff' ? (
+                <select
+                  value={form.requester_id}
+                  onChange={(e) => set('requester_id', e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="">— None —</option>
+                  {Object.entries(deptGroups).map(([dept, members]) => (
+                    <optgroup key={dept} label={dept}>
+                      {members.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </optgroup>
+                  ))}
+                </select>
+              ) : (
+                <select
+                  value={form.association_id}
+                  onChange={(e) => set('association_id', e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="">— None —</option>
+                  {associations.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">

@@ -13,6 +13,7 @@ interface Ticket {
   due_date: string | null; created_at: string; updated_at: string;
   category_name: string | null; assigned_name: string | null; creator_name: string | null;
   requester_id: number | null; requester_name: string | null; requester_department: string | null;
+  association_id: number | null; association_name: string | null;
 }
 interface Note { id: number; note: string; admin_name: string; created_at: string }
 interface Attachment { id: number; filename: string; original_name: string; file_size: number; mime_type: string; created_at: string; admin_name: string; }
@@ -20,6 +21,7 @@ interface HistoryItem { id: number; action: string; old_value: string | null; ne
 interface Category { id: number; name: string; }
 interface Admin { id: number; name: string; }
 interface Staff { id: number; name: string; department: string | null; }
+interface Association { id: number; name: string; }
 
 export default function TicketDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -42,7 +44,9 @@ export default function TicketDetailPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [staffList, setStaffList] = useState<Staff[]>([]);
-  const [editForm, setEditForm] = useState({ title: '', description: '', priority: '', category_id: '', assigned_to: '', due_date: '', requester_id: '' });
+  const [associationList, setAssociationList] = useState<Association[]>([]);
+  const [editRequesterType, setEditRequesterType] = useState<'staff' | 'association'>('staff');
+  const [editForm, setEditForm] = useState({ title: '', description: '', priority: '', category_id: '', assigned_to: '', due_date: '', requester_id: '', association_id: '' });
   const [editSaving, setEditSaving] = useState(false);
 
   async function load() {
@@ -60,6 +64,8 @@ export default function TicketDetailPage() {
 
   function openEdit() {
     if (!ticket) return;
+    const type = ticket.association_id ? 'association' : 'staff';
+    setEditRequesterType(type);
     setEditForm({
       title: ticket.title,
       description: ticket.description ?? '',
@@ -68,13 +74,16 @@ export default function TicketDetailPage() {
       assigned_to: ticket.assigned_to ? String(ticket.assigned_to) : '',
       due_date: ticket.due_date ? ticket.due_date.slice(0, 10) : '',
       requester_id: ticket.requester_id ? String(ticket.requester_id) : '',
+      association_id: ticket.association_id ? String(ticket.association_id) : '',
     });
-    // Load dropdowns
     Promise.all([
       fetch('/api/categories').then((r) => r.json()),
       fetch('/api/users').then((r) => r.json()),
       fetch('/api/staff').then((r) => r.json()),
-    ]).then(([cats, adms, stf]) => { setCategories(cats); setAdmins(adms); setStaffList(stf); });
+      fetch('/api/associations').then((r) => r.json()),
+    ]).then(([cats, adms, stf, assocs]) => {
+      setCategories(cats); setAdmins(adms); setStaffList(stf); setAssociationList(assocs);
+    });
     setShowEdit(true);
   }
 
@@ -91,8 +100,8 @@ export default function TicketDetailPage() {
         category_id: editForm.category_id || null,
         assigned_to: editForm.assigned_to || null,
         due_date: editForm.due_date || null,
-        requester_id: editForm.requester_id || null,
-        status: ticket?.status,
+        requester_id: editRequesterType === 'staff' ? (editForm.requester_id || null) : null,
+        association_id: editRequesterType === 'association' ? (editForm.association_id || null) : null,
       }),
     });
     setEditSaving(false);
@@ -224,16 +233,36 @@ export default function TicketDetailPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Requested By</label>
-                  <select value={editForm.requester_id} onChange={(e) => setEditForm((f) => ({ ...f, requester_id: e.target.value }))}
-                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    <option value="">— None —</option>
-                    {Object.entries(deptGroups).map(([dept, members]) => (
-                      <optgroup key={dept} label={dept}>
-                        {members.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                      </optgroup>
-                    ))}
-                  </select>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Requested By</label>
+                  <div className="flex rounded-lg border border-slate-300 overflow-hidden mb-2 w-fit">
+                    <button type="button"
+                      onClick={() => { setEditRequesterType('staff'); setEditForm((f) => ({ ...f, association_id: '' })); }}
+                      className={`px-3 py-1 text-sm font-medium transition-colors ${editRequesterType === 'staff' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>
+                      Staff
+                    </button>
+                    <button type="button"
+                      onClick={() => { setEditRequesterType('association'); setEditForm((f) => ({ ...f, requester_id: '' })); }}
+                      className={`px-3 py-1 text-sm font-medium border-l border-slate-300 transition-colors ${editRequesterType === 'association' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>
+                      Association / Federation
+                    </button>
+                  </div>
+                  {editRequesterType === 'staff' ? (
+                    <select value={editForm.requester_id} onChange={(e) => setEditForm((f) => ({ ...f, requester_id: e.target.value }))}
+                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                      <option value="">— None —</option>
+                      {Object.entries(deptGroups).map(([dept, members]) => (
+                        <optgroup key={dept} label={dept}>
+                          {members.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                        </optgroup>
+                      ))}
+                    </select>
+                  ) : (
+                    <select value={editForm.association_id} onChange={(e) => setEditForm((f) => ({ ...f, association_id: e.target.value }))}
+                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                      <option value="">— None —</option>
+                      {associationList.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    </select>
+                  )}
                 </div>
                 <div className="flex gap-3 pt-2">
                   <button type="submit" disabled={editSaving}
@@ -361,10 +390,17 @@ export default function TicketDetailPage() {
               <div><div className="text-xs text-slate-400 mb-0.5">Assigned To</div><div className="text-sm text-slate-700">{ticket.assigned_name ?? 'Unassigned'}</div></div>
               <div>
                 <div className="text-xs text-slate-400 mb-0.5">Requested By</div>
-                <div className="text-sm text-slate-700">
-                  {ticket.requester_name ?? '—'}
-                  {ticket.requester_department && <span className="text-xs text-slate-400 ml-1">({ticket.requester_department})</span>}
-                </div>
+                {ticket.association_id ? (
+                  <div className="text-sm text-slate-700">
+                    {ticket.association_name ?? '—'}
+                    <span className="text-xs text-slate-400 ml-1">(Association)</span>
+                  </div>
+                ) : (
+                  <div className="text-sm text-slate-700">
+                    {ticket.requester_name ?? '—'}
+                    {ticket.requester_department && <span className="text-xs text-slate-400 ml-1">({ticket.requester_department})</span>}
+                  </div>
+                )}
               </div>
               <div><div className="text-xs text-slate-400 mb-0.5">Created By</div><div className="text-sm text-slate-700">{ticket.creator_name ?? '—'}</div></div>
               {ticket.due_date && <div><div className="text-xs text-slate-400 mb-0.5">Due Date</div><div className="text-sm text-slate-700">{formatDate(ticket.due_date)}</div></div>}

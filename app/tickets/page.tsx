@@ -13,6 +13,7 @@ interface Ticket {
   priority: string; created_at: string; due_date: string | null;
   category_name: string | null; assigned_name: string | null;
   requester_name: string | null; requester_department: string | null;
+  association_name: string | null;
 }
 
 const PRIORITIES = ['', 'low', 'medium', 'high', 'critical'];
@@ -129,7 +130,7 @@ function TicketsInner() {
                       <div className="min-w-0">
                         <div className="text-xs text-slate-400 font-mono">{t.ticket_number}</div>
                         <div className="text-sm font-medium text-slate-900 truncate">{t.title}</div>
-                        {t.requester_name && <div className="text-xs text-indigo-600 mt-0.5">Requested by {t.requester_name}</div>}
+                        {(t.requester_name ?? t.association_name) && <div className="text-xs text-indigo-600 mt-0.5">Requested by {t.requester_name ?? t.association_name}</div>}
                         <div className="text-xs text-slate-500 mt-0.5">{formatDateTime(t.created_at)}</div>
                       </div>
                       <div className="flex flex-col items-end gap-1 flex-shrink-0">
@@ -170,7 +171,7 @@ function TicketsInner() {
                           {t.title}
                         </Link>
                       </td>
-                      <td className="px-4 py-3 text-slate-600">{t.requester_name ?? '—'}</td>
+                      <td className="px-4 py-3 text-slate-600">{t.requester_name ?? t.association_name ?? '—'}</td>
                       <td className="px-4 py-3">
                         <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusColor(t.status, statuses)}`}>
                           {statusLabel(t.status, statuses)}

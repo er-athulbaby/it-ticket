@@ -13,6 +13,7 @@ const navItems = [
   { href: '/tickets', label: 'Tickets', icon: '🎫' },
   { href: '/categories', label: 'Categories', icon: '🏷️' },
   { href: '/staff', label: 'Staff', icon: '👤' },
+  { href: '/associations', label: 'Associations', icon: '🏢' },
   { href: '/users', label: 'Users', icon: '👥' },
   { href: '/settings', label: 'Settings', icon: '⚙️' },
 ];
