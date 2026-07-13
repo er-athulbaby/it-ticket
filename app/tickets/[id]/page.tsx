@@ -3,32 +3,28 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import AppLayout from '@/components/layout/AppLayout';
-import {
-  STATUS_COLORS, STATUS_LABELS, PRIORITY_COLORS, PRIORITY_LABELS,
-  STATUSES, formatDateTime, formatDate, formatFileSize,
-} from '@/lib/utils';
-import type { Status, Priority } from '@/lib/utils';
+import { PRIORITY_COLORS, PRIORITY_LABELS, PRIORITIES, formatDateTime, formatDate, formatFileSize } from '@/lib/utils';
+import type { Priority } from '@/lib/utils';
+import { useStatuses, statusColor, statusLabel } from '@/lib/useStatuses';
 
 interface Ticket {
   id: number; ticket_number: string; title: string; description: string;
   status: string; priority: string; category_id: number | null; assigned_to: number | null;
   due_date: string | null; created_at: string; updated_at: string;
   category_name: string | null; assigned_name: string | null; creator_name: string | null;
-  requester_name: string | null; requester_department: string | null;
+  requester_id: number | null; requester_name: string | null; requester_department: string | null;
 }
 interface Note { id: number; note: string; admin_name: string; created_at: string }
-interface Attachment {
-  id: number; filename: string; original_name: string; file_size: number;
-  mime_type: string; created_at: string; admin_name: string;
-}
-interface HistoryItem {
-  id: number; action: string; old_value: string | null; new_value: string | null;
-  admin_name: string; created_at: string;
-}
+interface Attachment { id: number; filename: string; original_name: string; file_size: number; mime_type: string; created_at: string; admin_name: string; }
+interface HistoryItem { id: number; action: string; old_value: string | null; new_value: string | null; admin_name: string; created_at: string; }
+interface Category { id: number; name: string; }
+interface Admin { id: number; name: string; }
+interface Staff { id: number; name: string; department: string | null; }
 
 export default function TicketDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const statuses = useStatuses();
 
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [notes, setNotes] = useState<Note[]>([]);
@@ -40,6 +36,14 @@ export default function TicketDetailPage() {
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Edit modal
+  const [showEdit, setShowEdit] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [admins, setAdmins] = useState<Admin[]>([]);
+  const [staffList, setStaffList] = useState<Staff[]>([]);
+  const [editForm, setEditForm] = useState({ title: '', description: '', priority: '', category_id: '', assigned_to: '', due_date: '', requester_id: '' });
+  const [editSaving, setEditSaving] = useState(false);
 
   async function load() {
     const res = await fetch(`/api/tickets/${id}`);
@@ -53,6 +57,48 @@ export default function TicketDetailPage() {
   }
 
   useEffect(() => { load(); }, [id]);
+
+  function openEdit() {
+    if (!ticket) return;
+    setEditForm({
+      title: ticket.title,
+      description: ticket.description ?? '',
+      priority: ticket.priority,
+      category_id: ticket.category_id ? String(ticket.category_id) : '',
+      assigned_to: ticket.assigned_to ? String(ticket.assigned_to) : '',
+      due_date: ticket.due_date ? ticket.due_date.slice(0, 10) : '',
+      requester_id: ticket.requester_id ? String(ticket.requester_id) : '',
+    });
+    // Load dropdowns
+    Promise.all([
+      fetch('/api/categories').then((r) => r.json()),
+      fetch('/api/users').then((r) => r.json()),
+      fetch('/api/staff').then((r) => r.json()),
+    ]).then(([cats, adms, stf]) => { setCategories(cats); setAdmins(adms); setStaffList(stf); });
+    setShowEdit(true);
+  }
+
+  async function saveEdit(e: React.FormEvent) {
+    e.preventDefault();
+    setEditSaving(true);
+    await fetch(`/api/tickets/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: editForm.title,
+        description: editForm.description,
+        priority: editForm.priority,
+        category_id: editForm.category_id || null,
+        assigned_to: editForm.assigned_to || null,
+        due_date: editForm.due_date || null,
+        requester_id: editForm.requester_id || null,
+        status: ticket?.status,
+      }),
+    });
+    setEditSaving(false);
+    setShowEdit(false);
+    await load();
+  }
 
   async function updateStatus(status: string) {
     setSaving(true);
@@ -82,8 +128,7 @@ export default function TicketDetailPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
-    const fd = new FormData();
-    fd.append('file', file);
+    const fd = new FormData(); fd.append('file', file);
     await fetch(`/api/tickets/${id}/attachments`, { method: 'POST', body: fd });
     await load();
     setUploading(false);
@@ -96,11 +141,15 @@ export default function TicketDetailPage() {
     router.push('/tickets');
   }
 
-  if (loading) {
-    return <AppLayout><div className="flex items-center justify-center h-48 text-slate-400">Loading…</div></AppLayout>;
-  }
-
+  if (loading) return <AppLayout><div className="flex items-center justify-center h-48 text-slate-400">Loading…</div></AppLayout>;
   if (!ticket) return null;
+
+  const deptGroups = staffList.reduce<Record<string, Staff[]>>((acc, s) => {
+    const dept = s.department || 'Other';
+    if (!acc[dept]) acc[dept] = [];
+    acc[dept].push(s);
+    return acc;
+  }, {});
 
   return (
     <AppLayout>
@@ -113,22 +162,100 @@ export default function TicketDetailPage() {
               <span className="text-xs font-mono text-slate-400">{ticket.ticket_number}</span>
               <h1 className="text-xl font-bold text-slate-900 mt-0.5">{ticket.title}</h1>
             </div>
-            <button
-              onClick={deleteTicket}
-              className="flex-shrink-0 text-red-500 hover:text-red-700 text-sm border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
-            >
-              Delete
-            </button>
+            <div className="flex gap-2 flex-shrink-0">
+              <button onClick={openEdit}
+                className="text-indigo-600 hover:text-indigo-800 text-sm border border-indigo-200 px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors">
+                Edit
+              </button>
+              <button onClick={deleteTicket}
+                className="text-red-500 hover:text-red-700 text-sm border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors">
+                Delete
+              </button>
+            </div>
           </div>
         </div>
+
+        {/* Edit Modal */}
+        {showEdit && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+              <h2 className="font-bold text-slate-900 text-lg mb-4">Edit Ticket</h2>
+              <form onSubmit={saveEdit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Title <span className="text-red-500">*</span></label>
+                  <input type="text" required value={editForm.title} onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))}
+                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Description</label>
+                  <textarea rows={3} value={editForm.description} onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
+                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Priority <span className="text-red-500">*</span></label>
+                    <select required value={editForm.priority} onChange={(e) => setEditForm((f) => ({ ...f, priority: e.target.value }))}
+                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                      {PRIORITIES.map((p) => <option key={p} value={p}>{PRIORITY_LABELS[p as Priority]}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Category</label>
+                    <select value={editForm.category_id} onChange={(e) => setEditForm((f) => ({ ...f, category_id: e.target.value }))}
+                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                      <option value="">— None —</option>
+                      {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Assigned To</label>
+                    <select value={editForm.assigned_to} onChange={(e) => setEditForm((f) => ({ ...f, assigned_to: e.target.value }))}
+                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                      <option value="">— Unassigned —</option>
+                      {admins.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Due Date</label>
+                    <input type="date" value={editForm.due_date} onChange={(e) => setEditForm((f) => ({ ...f, due_date: e.target.value }))}
+                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Requested By</label>
+                  <select value={editForm.requester_id} onChange={(e) => setEditForm((f) => ({ ...f, requester_id: e.target.value }))}
+                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <option value="">— None —</option>
+                    {Object.entries(deptGroups).map(([dept, members]) => (
+                      <optgroup key={dept} label={dept}>
+                        {members.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                      </optgroup>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button type="submit" disabled={editSaving}
+                    className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-medium px-5 py-2.5 rounded-lg text-sm">
+                    {editSaving ? 'Saving…' : 'Save Changes'}
+                  </button>
+                  <button type="button" onClick={() => setShowEdit(false)}
+                    className="border border-slate-300 text-slate-700 font-medium px-5 py-2.5 rounded-lg text-sm hover:bg-slate-50">
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
         <div className="grid md:grid-cols-3 gap-5">
           {/* Main content */}
           <div className="md:col-span-2 space-y-5">
-            {/* Description */}
             <div className="bg-white border border-slate-200 rounded-xl p-5">
               <h2 className="font-semibold text-slate-900 mb-3">Description</h2>
-              <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{ticket.description}</p>
+              <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{ticket.description || <span className="text-slate-400 italic">No description</span>}</p>
             </div>
 
             {/* Notes */}
@@ -146,18 +273,10 @@ export default function TicketDetailPage() {
                 ))}
               </div>
               <div className="space-y-2">
-                <textarea
-                  rows={3}
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  placeholder="Add a note…"
-                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
-                />
-                <button
-                  onClick={addNote}
-                  disabled={addingNote || !note.trim()}
-                  className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-                >
+                <textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Add a note…"
+                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" />
+                <button onClick={addNote} disabled={addingNote || !note.trim()}
+                  className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
                   {addingNote ? 'Adding…' : 'Add Note'}
                 </button>
               </div>
@@ -174,24 +293,16 @@ export default function TicketDetailPage() {
                         <div className="text-sm font-medium text-slate-900 truncate">{a.original_name}</div>
                         <div className="text-xs text-slate-500">{formatFileSize(a.file_size)} · {a.admin_name}</div>
                       </div>
-                      <a
-                        href={`/uploads/${id}/${a.filename}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-indigo-600 hover:text-indigo-800 text-xs font-medium ml-3 flex-shrink-0"
-                      >
-                        Download
-                      </a>
+                      <a href={`/uploads/${id}/${a.filename}`} target="_blank" rel="noopener noreferrer"
+                        className="text-indigo-600 hover:text-indigo-800 text-xs font-medium ml-3 flex-shrink-0">Download</a>
                     </div>
                   ))}
                 </div>
               )}
               <div>
                 <input ref={fileRef} type="file" onChange={uploadFile} className="hidden" id="file-upload" />
-                <label
-                  htmlFor="file-upload"
-                  className="inline-flex items-center gap-2 border border-slate-300 text-slate-700 text-sm font-medium px-4 py-2 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors"
-                >
+                <label htmlFor="file-upload"
+                  className="inline-flex items-center gap-2 border border-slate-300 text-slate-700 text-sm font-medium px-4 py-2 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors">
                   {uploading ? 'Uploading…' : '+ Attach File'}
                 </label>
                 <span className="text-xs text-slate-400 ml-2">Max 10 MB</span>
@@ -201,18 +312,14 @@ export default function TicketDetailPage() {
             {/* History */}
             <div className="bg-white border border-slate-200 rounded-xl p-5">
               <h2 className="font-semibold text-slate-900 mb-4">Activity</h2>
-              {history.length === 0 ? (
-                <p className="text-sm text-slate-400">No activity yet</p>
-              ) : (
+              {history.length === 0 ? <p className="text-sm text-slate-400">No activity yet</p> : (
                 <div className="space-y-2">
                   {history.map((h) => (
                     <div key={h.id} className="flex items-start gap-3 text-sm">
                       <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-1.5 flex-shrink-0" />
                       <div>
                         <span className="font-medium text-slate-700">{h.admin_name}</span>{' '}
-                        {h.action === 'status_changed' && (
-                          <span className="text-slate-600">changed status from <b>{h.old_value}</b> to <b>{h.new_value}</b></span>
-                        )}
+                        {h.action === 'status_changed' && <span className="text-slate-600">changed status from <b>{h.old_value}</b> to <b>{h.new_value}</b></span>}
                         {h.action === 'created' && <span className="text-slate-600">created this ticket</span>}
                         {h.action === 'assigned' && <span className="text-slate-600">assigned the ticket</span>}
                         <div className="text-xs text-slate-400 mt-0.5">{formatDateTime(h.created_at)}</div>
@@ -229,19 +336,13 @@ export default function TicketDetailPage() {
             {/* Status */}
             <div className="bg-white border border-slate-200 rounded-xl p-4">
               <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Status</h3>
-              <div className="space-y-2">
-                {STATUSES.map((s) => (
-                  <button
-                    key={s}
-                    disabled={saving || ticket.status === s}
-                    onClick={() => updateStatus(s)}
+              <div className="space-y-1.5">
+                {statuses.map((s) => (
+                  <button key={s.slug} disabled={saving || ticket.status === s.slug} onClick={() => updateStatus(s.slug)}
                     className={`w-full text-left text-sm px-3 py-2 rounded-lg transition-colors font-medium ${
-                      ticket.status === s
-                        ? STATUS_COLORS[s as Status] + ' ring-1 ring-current'
-                        : 'text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    {STATUS_LABELS[s as Status]}
+                      ticket.status === s.slug ? s.color_class + ' ring-1 ring-current' : 'text-slate-600 hover:bg-slate-50'
+                    }`}>
+                    {s.label}
                   </button>
                 ))}
               </div>
@@ -250,55 +351,25 @@ export default function TicketDetailPage() {
             {/* Details */}
             <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
               <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Details</h3>
-
               <div>
                 <div className="text-xs text-slate-400 mb-0.5">Priority</div>
                 <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${PRIORITY_COLORS[ticket.priority as Priority]}`}>
                   {PRIORITY_LABELS[ticket.priority as Priority]}
                 </span>
               </div>
-
-              <div>
-                <div className="text-xs text-slate-400 mb-0.5">Category</div>
-                <div className="text-sm text-slate-700">{ticket.category_name ?? '—'}</div>
-              </div>
-
-              <div>
-                <div className="text-xs text-slate-400 mb-0.5">Assigned To</div>
-                <div className="text-sm text-slate-700">{ticket.assigned_name ?? 'Unassigned'}</div>
-              </div>
-
+              <div><div className="text-xs text-slate-400 mb-0.5">Category</div><div className="text-sm text-slate-700">{ticket.category_name ?? '—'}</div></div>
+              <div><div className="text-xs text-slate-400 mb-0.5">Assigned To</div><div className="text-sm text-slate-700">{ticket.assigned_name ?? 'Unassigned'}</div></div>
               <div>
                 <div className="text-xs text-slate-400 mb-0.5">Requested By</div>
                 <div className="text-sm text-slate-700">
                   {ticket.requester_name ?? '—'}
-                  {ticket.requester_department && (
-                    <span className="text-xs text-slate-400 ml-1">({ticket.requester_department})</span>
-                  )}
+                  {ticket.requester_department && <span className="text-xs text-slate-400 ml-1">({ticket.requester_department})</span>}
                 </div>
               </div>
-
-              <div>
-                <div className="text-xs text-slate-400 mb-0.5">Created By</div>
-                <div className="text-sm text-slate-700">{ticket.creator_name ?? '—'}</div>
-              </div>
-
-              {ticket.due_date && (
-                <div>
-                  <div className="text-xs text-slate-400 mb-0.5">Due Date</div>
-                  <div className="text-sm text-slate-700">{formatDate(ticket.due_date)}</div>
-                </div>
-              )}
-
-              <div>
-                <div className="text-xs text-slate-400 mb-0.5">Created</div>
-                <div className="text-sm text-slate-700">{formatDateTime(ticket.created_at)}</div>
-              </div>
-
-              <div>
-                <div className="text-xs text-slate-400 mb-0.5">Last Updated</div>
-                <div className="text-sm text-slate-700">{formatDateTime(ticket.updated_at)}</div>
-              </div>
+              <div><div className="text-xs text-slate-400 mb-0.5">Created By</div><div className="text-sm text-slate-700">{ticket.creator_name ?? '—'}</div></div>
+              {ticket.due_date && <div><div className="text-xs text-slate-400 mb-0.5">Due Date</div><div className="text-sm text-slate-700">{formatDate(ticket.due_date)}</div></div>}
+              <div><div className="text-xs text-slate-400 mb-0.5">Created</div><div className="text-sm text-slate-700">{formatDateTime(ticket.created_at)}</div></div>
+              <div><div className="text-xs text-slate-400 mb-0.5">Last Updated</div><div className="text-sm text-slate-700">{formatDateTime(ticket.updated_at)}</div></div>
             </div>
           </div>
         </div>

@@ -4,8 +4,9 @@ import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import AppLayout from '@/components/layout/AppLayout';
-import { STATUS_COLORS, STATUS_LABELS, PRIORITY_COLORS, PRIORITY_LABELS, formatDateTime } from '@/lib/utils';
-import type { Status, Priority } from '@/lib/utils';
+import { PRIORITY_COLORS, PRIORITY_LABELS, formatDateTime } from '@/lib/utils';
+import type { Priority } from '@/lib/utils';
+import { useStatuses, statusColor, statusLabel } from '@/lib/useStatuses';
 
 interface Ticket {
   id: number; ticket_number: string; title: string; status: string;
@@ -14,7 +15,6 @@ interface Ticket {
   requester_name: string | null; requester_department: string | null;
 }
 
-const STATUSES = ['', 'open', 'in_progress', 'resolved', 'closed'];
 const PRIORITIES = ['', 'low', 'medium', 'high', 'critical'];
 
 export default function TicketsPage() {
@@ -22,6 +22,7 @@ export default function TicketsPage() {
 }
 
 function TicketsInner() {
+  const statuses = useStatuses();
   const searchParams = useSearchParams();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [total, setTotal] = useState(0);
@@ -93,8 +94,8 @@ function TicketsInner() {
             className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
           >
             <option value="">All Statuses</option>
-            {STATUSES.slice(1).map((s) => (
-              <option key={s} value={s}>{STATUS_LABELS[s as Status]}</option>
+            {statuses.map((s) => (
+              <option key={s.slug} value={s.slug}>{s.label}</option>
             ))}
           </select>
           <select
@@ -132,8 +133,8 @@ function TicketsInner() {
                         <div className="text-xs text-slate-500 mt-0.5">{formatDateTime(t.created_at)}</div>
                       </div>
                       <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_COLORS[t.status as Status]}`}>
-                          {STATUS_LABELS[t.status as Status]}
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusColor(t.status, statuses)}`}>
+                          {statusLabel(t.status, statuses)}
                         </span>
                         <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${PRIORITY_COLORS[t.priority as Priority]}`}>
                           {PRIORITY_LABELS[t.priority as Priority]}
@@ -171,8 +172,8 @@ function TicketsInner() {
                       </td>
                       <td className="px-4 py-3 text-slate-600">{t.requester_name ?? '—'}</td>
                       <td className="px-4 py-3">
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_COLORS[t.status as Status]}`}>
-                          {STATUS_LABELS[t.status as Status]}
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusColor(t.status, statuses)}`}>
+                          {statusLabel(t.status, statuses)}
                         </span>
                       </td>
                       <td className="px-4 py-3">

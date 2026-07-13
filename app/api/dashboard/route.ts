@@ -6,17 +6,12 @@ export async function GET() {
   const session = await auth();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const [counts] = await query<{
-    total: string; open: string; in_progress: string; resolved: string; closed: string;
-  }>(`
-    SELECT
-      COUNT(*) AS total,
-      COUNT(*) FILTER (WHERE status = 'open') AS open,
-      COUNT(*) FILTER (WHERE status = 'in_progress') AS in_progress,
-      COUNT(*) FILTER (WHERE status = 'resolved') AS resolved,
-      COUNT(*) FILTER (WHERE status = 'closed') AS closed
-    FROM tickets
-  `);
+  const total = await query<{ count: string }>('SELECT COUNT(*) AS count FROM tickets');
+
+  // Per-status counts dynamically
+  const statusCounts = await query<{ status: string; count: string }>(
+    'SELECT status, COUNT(*) AS count FROM tickets GROUP BY status'
+  );
 
   const byPriority = await query<{ priority: string; count: string }>(`
     SELECT priority, COUNT(*) AS count FROM tickets
@@ -33,5 +28,10 @@ export async function GET() {
     ORDER BY t.created_at DESC LIMIT 5
   `);
 
-  return NextResponse.json({ counts, byPriority, recent });
+  return NextResponse.json({
+    total: parseInt(total[0]?.count ?? '0'),
+    statusCounts,
+    byPriority,
+    recent,
+  });
 }

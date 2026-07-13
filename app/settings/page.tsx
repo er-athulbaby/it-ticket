@@ -1,9 +1,23 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/layout/AppLayout';
 import { THEMES, type ThemeKey } from '@/lib/themes';
+import type { TicketStatus } from '@/lib/useStatuses';
+
+const COLOR_OPTIONS = [
+  { label: 'Yellow',  value: 'bg-yellow-100 text-yellow-700' },
+  { label: 'Blue',    value: 'bg-blue-100 text-blue-700' },
+  { label: 'Green',   value: 'bg-green-100 text-green-700' },
+  { label: 'Orange',  value: 'bg-orange-100 text-orange-700' },
+  { label: 'Red',     value: 'bg-red-100 text-red-700' },
+  { label: 'Purple',  value: 'bg-purple-100 text-purple-700' },
+  { label: 'Pink',    value: 'bg-pink-100 text-pink-700' },
+  { label: 'Teal',    value: 'bg-teal-100 text-teal-700' },
+  { label: 'Indigo',  value: 'bg-indigo-100 text-indigo-700' },
+  { label: 'Gray',    value: 'bg-slate-100 text-slate-600' },
+];
 
 export default function SettingsPage() {
   const { data: session } = useSession();
@@ -12,6 +26,39 @@ export default function SettingsPage() {
   const [photoUrl, setPhotoUrl] = useState('');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const photoRef = useRef<HTMLInputElement>(null);
+
+  // Statuses
+  const [ticketStatuses, setTicketStatuses] = useState<TicketStatus[]>([]);
+  const [showAddStatus, setShowAddStatus] = useState(false);
+  const [newStatus, setNewStatus] = useState({ label: '', slug: '', color_class: 'bg-slate-100 text-slate-600' });
+  const [savingStatus, setSavingStatus] = useState(false);
+
+  const loadStatuses = useCallback(() => {
+    fetch('/api/ticket-statuses').then((r) => r.json()).then(setTicketStatuses);
+  }, []);
+
+  useEffect(() => { loadStatuses(); }, [loadStatuses]);
+
+  async function addStatus() {
+    if (!newStatus.label.trim()) return;
+    setSavingStatus(true);
+    const slug = newStatus.slug.trim() || newStatus.label.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    await fetch('/api/ticket-statuses', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...newStatus, slug }),
+    });
+    setNewStatus({ label: '', slug: '', color_class: 'bg-slate-100 text-slate-600' });
+    setShowAddStatus(false);
+    setSavingStatus(false);
+    loadStatuses();
+  }
+
+  async function deleteStatus(id: number) {
+    if (!window.confirm('Delete this status?')) return;
+    await fetch('/api/ticket-statuses', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
+    loadStatuses();
+  }
 
   // Theme
   const [theme, setTheme] = useState<ThemeKey>('indigo');
@@ -168,6 +215,76 @@ export default function SettingsPage() {
             ))}
           </div>
           <p className="text-xs text-slate-400 mt-3">Reload the page after changing to see the new theme in the sidebar.</p>
+        </div>
+
+        {/* Ticket Statuses */}
+        <div className="bg-white border border-slate-200 rounded-xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="font-semibold text-slate-900">Ticket Statuses</h2>
+              <p className="text-sm text-slate-500 mt-0.5">Add custom statuses like SG, Finance, Other</p>
+            </div>
+            <button onClick={() => setShowAddStatus(true)}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-3 py-2 rounded-lg transition-colors">
+              + Add Status
+            </button>
+          </div>
+
+          <div className="space-y-2 mb-4">
+            {ticketStatuses.map((s) => (
+              <div key={s.id} className="flex items-center justify-between px-3 py-2.5 rounded-lg border border-slate-100 bg-slate-50">
+                <div className="flex items-center gap-3">
+                  <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${s.color_class}`}>{s.label}</span>
+                  <span className="text-xs text-slate-400 font-mono">{s.slug}</span>
+                  {s.is_system && <span className="text-xs text-slate-400 bg-slate-200 px-1.5 py-0.5 rounded">system</span>}
+                </div>
+                {!s.is_system && (
+                  <button onClick={() => deleteStatus(s.id)} className="text-red-400 hover:text-red-600 text-xs font-medium">Delete</button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {showAddStatus && (
+            <div className="border border-indigo-200 bg-indigo-50 rounded-xl p-4 space-y-3">
+              <p className="text-sm font-semibold text-slate-800">New Status</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">Label <span className="text-red-500">*</span></label>
+                  <input type="text" value={newStatus.label} onChange={(e) => setNewStatus((n) => ({ ...n, label: e.target.value }))}
+                    placeholder="e.g. SG, Finance, Other"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">Slug (auto if blank)</label>
+                  <input type="text" value={newStatus.slug} onChange={(e) => setNewStatus((n) => ({ ...n, slug: e.target.value }))}
+                    placeholder="e.g. sg, finance"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">Colour</label>
+                <div className="flex flex-wrap gap-2">
+                  {COLOR_OPTIONS.map((c) => (
+                    <button key={c.value} onClick={() => setNewStatus((n) => ({ ...n, color_class: c.value }))}
+                      className={`text-xs px-2.5 py-1 rounded-full font-medium transition-all ${c.value} ${newStatus.color_class === c.value ? 'ring-2 ring-offset-1 ring-slate-800 scale-110' : ''}`}>
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button onClick={addStatus} disabled={savingStatus || !newStatus.label.trim()}
+                  className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                  {savingStatus ? 'Saving…' : 'Add Status'}
+                </button>
+                <button onClick={() => setShowAddStatus(false)}
+                  className="border border-slate-300 text-slate-700 text-sm font-medium px-4 py-2 rounded-lg hover:bg-white transition-colors">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Branding */}

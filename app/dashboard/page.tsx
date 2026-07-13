@@ -2,28 +2,23 @@
 
 import { useEffect, useState } from 'react';
 import AppLayout from '@/components/layout/AppLayout';
-import { STATUS_COLORS, STATUS_LABELS, PRIORITY_COLORS, PRIORITY_LABELS, formatDateTime } from '@/lib/utils';
-import type { Status, Priority } from '@/lib/utils';
+import { PRIORITY_COLORS, PRIORITY_LABELS, formatDateTime } from '@/lib/utils';
+import type { Priority } from '@/lib/utils';
 import Link from 'next/link';
+import { useStatuses, statusColor, statusLabel } from '@/lib/useStatuses';
+import type { TicketStatus } from '@/lib/useStatuses';
 
-interface Stats {
-  total: string; open: string; in_progress: string; resolved: string; closed: string;
-}
-interface ByPriority { priority: string; count: string }
+interface StatusCount { status: string; count: string; }
+interface ByPriority { priority: string; count: string; }
 interface RecentTicket {
   id: number; ticket_number: string; title: string; status: string;
-  priority: string; created_at: string; category_name: string; assigned_name: string;
+  priority: string; created_at: string;
 }
 
-const statCards = [
-  { key: 'total',       label: 'Total Tickets', bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200', filter: '' },
-  { key: 'open',        label: 'Open',          bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-200', filter: 'open' },
-  { key: 'in_progress', label: 'In Progress',   bg: 'bg-blue-50',   text: 'text-blue-700',   border: 'border-blue-200',   filter: 'in_progress' },
-  { key: 'resolved',    label: 'Resolved',      bg: 'bg-green-50',  text: 'text-green-700',  border: 'border-green-200',  filter: 'resolved' },
-];
-
 export default function DashboardPage() {
-  const [stats, setStats] = useState<Stats | null>(null);
+  const statuses = useStatuses();
+  const [total, setTotal] = useState(0);
+  const [statusCounts, setStatusCounts] = useState<StatusCount[]>([]);
   const [byPriority, setByPriority] = useState<ByPriority[]>([]);
   const [recent, setRecent] = useState<RecentTicket[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,51 +27,60 @@ export default function DashboardPage() {
     fetch('/api/dashboard')
       .then((r) => r.json())
       .then((d) => {
-        setStats(d.counts);
+        setTotal(d.total);
+        setStatusCounts(d.statusCounts);
         setByPriority(d.byPriority);
         setRecent(d.recent);
         setLoading(false);
       });
   }, []);
 
-  if (loading) {
-    return (
-      <AppLayout>
-        <div className="flex items-center justify-center h-48 text-slate-400">Loading…</div>
-      </AppLayout>
-    );
+  function countFor(slug: string) {
+    return parseInt(statusCounts.find((s) => s.status === slug)?.count ?? '0');
   }
+
+  if (loading) return <AppLayout><div className="flex items-center justify-center h-48 text-slate-400">Loading…</div></AppLayout>;
 
   return (
     <AppLayout>
       <div className="max-w-5xl mx-auto space-y-6">
-        {/* Header */}
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-          <Link
-            href="/tickets/new"
-            className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-          >
+          <Link href="/tickets/new" className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
             + New Ticket
           </Link>
         </div>
 
-        {/* Stat cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {statCards.map((card) => (
-            <Link
-              key={card.key}
-              href={card.filter ? `/tickets?status=${card.filter}` : '/tickets'}
-              className={`${card.bg} border ${card.border} rounded-xl p-4 hover:shadow-md hover:scale-[1.02] transition-all`}
-            >
-              <div className={`text-3xl font-bold ${card.text}`}>
-                {stats?.[card.key as keyof Stats] ?? 0}
-              </div>
-              <div className="text-sm text-slate-600 mt-0.5">{card.label}</div>
-              <div className={`text-xs mt-2 ${card.text} opacity-70`}>View →</div>
-            </Link>
-          ))}
-        </div>
+        {/* Total card */}
+        <Link href="/tickets"
+          className="flex items-center justify-between bg-indigo-600 text-white rounded-xl px-6 py-4 hover:bg-indigo-700 hover:shadow-lg transition-all">
+          <div>
+            <div className="text-4xl font-bold">{total}</div>
+            <div className="text-indigo-200 text-sm mt-0.5">Total Tickets</div>
+          </div>
+          <span className="text-indigo-200 text-sm">View all →</span>
+        </Link>
+
+        {/* Per-status cards */}
+        {statuses.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {statuses.map((s: TicketStatus) => {
+              const count = countFor(s.slug);
+              return (
+                <Link key={s.slug} href={`/tickets?status=${s.slug}`}
+                  className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md hover:border-slate-300 hover:scale-[1.02] transition-all">
+                  <div className="text-3xl font-bold text-slate-800">{count}</div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${s.color_class}`}>
+                      {s.label}
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-400 mt-1">View →</div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
 
         <div className="grid md:grid-cols-3 gap-6">
           {/* Priority breakdown */}
@@ -109,18 +113,15 @@ export default function DashboardPage() {
             ) : (
               <div className="space-y-3">
                 {recent.map((t) => (
-                  <Link
-                    key={t.id}
-                    href={`/tickets/${t.id}`}
-                    className="flex items-start justify-between gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors"
-                  >
+                  <Link key={t.id} href={`/tickets/${t.id}`}
+                    className="flex items-start justify-between gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors">
                     <div className="min-w-0">
                       <div className="text-xs text-slate-400 font-mono">{t.ticket_number}</div>
                       <div className="text-sm font-medium text-slate-900 truncate">{t.title}</div>
                       <div className="text-xs text-slate-500 mt-0.5">{formatDateTime(t.created_at)}</div>
                     </div>
-                    <span className={`flex-shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_COLORS[t.status as Status]}`}>
-                      {STATUS_LABELS[t.status as Status] ?? t.status}
+                    <span className={`flex-shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${statusColor(t.status, statuses)}`}>
+                      {statusLabel(t.status, statuses)}
                     </span>
                   </Link>
                 ))}
