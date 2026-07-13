@@ -190,13 +190,9 @@ export default function SettingsPage() {
   }
 
   async function generateSecret() {
-    const secret = crypto.randomUUID().replace(/-/g, '');
-    setReminderSecret(secret);
-    await fetch('/api/settings', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reminder_secret: secret }),
-    });
+    const res = await fetch('/api/settings/generate-secret', { method: 'POST' });
+    const d = await res.json();
+    if (d.secret) setReminderSecret(d.secret);
   }
 
   async function testEmail() {
