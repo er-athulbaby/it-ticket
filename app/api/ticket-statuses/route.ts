@@ -3,10 +3,14 @@ import { getToken } from 'next-auth/jwt';
 import { query, queryOne } from '@/lib/db';
 
 export async function GET() {
-  const statuses = await query(
-    'SELECT * FROM ticket_statuses ORDER BY display_order ASC, id ASC'
-  );
-  return NextResponse.json(statuses);
+  try {
+    const statuses = await query(
+      'SELECT * FROM ticket_statuses ORDER BY display_order ASC, id ASC'
+    );
+    return NextResponse.json(statuses);
+  } catch {
+    return NextResponse.json([]);
+  }
 }
 
 export async function POST(req: NextRequest) {

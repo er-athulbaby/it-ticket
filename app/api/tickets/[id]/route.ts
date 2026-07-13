@@ -54,43 +54,55 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { id } = await params;
   const body = await req.json();
-  const { title, description, status, priority, category_id, assigned_to, due_date } = body;
 
   const existing = await queryOne<{ status: string; priority: string; assigned_to: number | null }>(
     'SELECT status, priority, assigned_to FROM tickets WHERE id = $1', [id]
   );
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const updated = await queryOne(`
-    UPDATE tickets SET
-      title = COALESCE($1, title),
-      description = COALESCE($2, description),
-      status = COALESCE($3, status),
-      priority = COALESCE($4, priority),
-      category_id = COALESCE($5, category_id),
-      assigned_to = COALESCE($6, assigned_to),
-      due_date = COALESCE($7, due_date),
-      resolved_at = CASE WHEN $3 = 'resolved' AND status != 'resolved' THEN NOW() ELSE resolved_at END,
-      closed_at = CASE WHEN $3 = 'closed' AND status != 'closed' THEN NOW() ELSE closed_at END
-    WHERE id = $8
-    RETURNING *
-  `, [title, description, status, priority, category_id, assigned_to, due_date, id]);
+  // Build SET clause dynamically so null explicitly clears nullable fields
+  const setClauses: string[] = [];
+  const values: unknown[] = [];
+  let idx = 1;
+
+  const set = (col: string, val: unknown) => { setClauses.push(`${col} = $${idx++}`); values.push(val ?? null); };
+
+  if ('title' in body) set('title', body.title);
+  if ('description' in body) set('description', body.description);
+  if ('priority' in body) set('priority', body.priority);
+  if ('category_id' in body) set('category_id', body.category_id ?? null);
+  if ('assigned_to' in body) set('assigned_to', body.assigned_to ?? null);
+  if ('due_date' in body) set('due_date', body.due_date ?? null);
+  if ('requester_id' in body) set('requester_id', body.requester_id ?? null);
+  if ('status' in body) {
+    set('status', body.status);
+    if (body.status === 'resolved') setClauses.push(`resolved_at = CASE WHEN status != 'resolved' THEN NOW() ELSE resolved_at END`);
+    if (body.status === 'closed') setClauses.push(`closed_at = CASE WHEN status != 'closed' THEN NOW() ELSE closed_at END`);
+  }
+
+  if (setClauses.length === 0) return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
+
+  values.push(id);
+  const updated = await queryOne(
+    `UPDATE tickets SET ${setClauses.join(', ')}, updated_at = NOW() WHERE id = $${idx} RETURNING *`,
+    values
+  );
 
   const rawSid = session?.user?.id ?? '';
   const adminId = rawSid ? parseInt(rawSid.replace('admin_', '')) : null;
 
-  if (status && status !== existing.status) {
+  if ('status' in body && body.status !== existing.status) {
     await query(`
       INSERT INTO ticket_history (ticket_id, admin_id, action, old_value, new_value)
       VALUES ($1, $2, 'status_changed', $3, $4)
-    `, [id, adminId, existing.status, status]);
+    `, [id, adminId, existing.status, body.status]);
   }
 
-  if (assigned_to && assigned_to !== existing.assigned_to) {
+  if ('assigned_to' in body && body.assigned_to && body.assigned_to !== existing.assigned_to) {
     await query(`
       INSERT INTO ticket_history (ticket_id, admin_id, action, new_value)
       VALUES ($1, $2, 'assigned', $3)
-    `, [id, adminId, String(assigned_to)]);
+    `, [id, adminId, String(body.assigned_to)]);
   }
 
   return NextResponse.json(updated);
