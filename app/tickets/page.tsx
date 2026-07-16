@@ -7,6 +7,7 @@ import AppLayout from '@/components/layout/AppLayout';
 import { PRIORITY_COLORS, PRIORITY_LABELS, formatDateTime } from '@/lib/utils';
 import type { Priority } from '@/lib/utils';
 import { useStatuses, statusColor, statusLabel } from '@/lib/useStatuses';
+import { useSession } from 'next-auth/react';
 
 interface Ticket {
   id: number; ticket_number: string; title: string; status: string;
@@ -23,6 +24,8 @@ export default function TicketsPage() {
 }
 
 function TicketsInner() {
+  const { data: session } = useSession();
+  const isViewer = (session?.user as { role?: string })?.role === 'viewer';
   const statuses = useStatuses();
   const searchParams = useSearchParams();
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -64,20 +67,22 @@ function TicketsInner() {
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-bold text-slate-900">Tickets</h1>
-          <div className="flex gap-2">
-            <button
-              onClick={exportExcel}
-              className="border border-slate-300 text-slate-700 text-sm font-medium px-3 py-2 rounded-lg hover:bg-slate-50 transition-colors"
-            >
-              Export Excel
-            </button>
-            <Link
-              href="/tickets/new"
-              className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-            >
-              + New Ticket
-            </Link>
-          </div>
+          {!isViewer && (
+            <div className="flex gap-2">
+              <button
+                onClick={exportExcel}
+                className="border border-slate-300 text-slate-700 text-sm font-medium px-3 py-2 rounded-lg hover:bg-slate-50 transition-colors"
+              >
+                Export Excel
+              </button>
+              <Link
+                href="/tickets/new"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+              >
+                + New Ticket
+              </Link>
+            </div>
+          )}
         </div>
 
         {/* Filters */}

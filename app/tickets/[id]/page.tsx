@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/layout/AppLayout';
 import { PRIORITY_COLORS, PRIORITY_LABELS, PRIORITIES, formatDateTime, formatDate, formatFileSize } from '@/lib/utils';
 import type { Priority } from '@/lib/utils';
@@ -27,6 +28,8 @@ interface Association { id: number; name: string; }
 export default function TicketDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { data: session } = useSession();
+  const isViewer = (session?.user as { role?: string })?.role === 'viewer';
   const statuses = useStatuses();
 
   const [ticket, setTicket] = useState<Ticket | null>(null);
@@ -172,16 +175,18 @@ export default function TicketDetailPage() {
               <span className="text-xs font-mono text-slate-400">{ticket.ticket_number}</span>
               <h1 className="text-xl font-bold text-slate-900 mt-0.5">{ticket.title}</h1>
             </div>
-            <div className="flex gap-2 flex-shrink-0">
-              <button onClick={openEdit}
-                className="text-indigo-600 hover:text-indigo-800 text-sm border border-indigo-200 px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors">
-                Edit
-              </button>
-              <button onClick={deleteTicket}
-                className="text-red-500 hover:text-red-700 text-sm border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors">
-                Delete
-              </button>
-            </div>
+            {!isViewer && (
+              <div className="flex gap-2 flex-shrink-0">
+                <button onClick={openEdit}
+                  className="text-indigo-600 hover:text-indigo-800 text-sm border border-indigo-200 px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors">
+                  Edit
+                </button>
+                <button onClick={deleteTicket}
+                  className="text-red-500 hover:text-red-700 text-sm border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors">
+                  Delete
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -302,14 +307,16 @@ export default function TicketDetailPage() {
                   </div>
                 ))}
               </div>
-              <div className="space-y-2">
-                <textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Add a note…"
-                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" />
-                <button onClick={addNote} disabled={addingNote || !note.trim()}
-                  className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
-                  {addingNote ? 'Adding…' : 'Add Note'}
-                </button>
-              </div>
+              {!isViewer && (
+                <div className="space-y-2">
+                  <textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Add a note…"
+                    className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" />
+                  <button onClick={addNote} disabled={addingNote || !note.trim()}
+                    className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                    {addingNote ? 'Adding…' : 'Add Note'}
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Attachments */}
@@ -329,14 +336,16 @@ export default function TicketDetailPage() {
                   ))}
                 </div>
               )}
-              <div>
-                <input ref={fileRef} type="file" onChange={uploadFile} className="hidden" id="file-upload" />
-                <label htmlFor="file-upload"
-                  className="inline-flex items-center gap-2 border border-slate-300 text-slate-700 text-sm font-medium px-4 py-2 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors">
-                  {uploading ? 'Uploading…' : '+ Attach File'}
-                </label>
-                <span className="text-xs text-slate-400 ml-2">Max 10 MB</span>
-              </div>
+              {!isViewer && (
+                <div>
+                  <input ref={fileRef} type="file" onChange={uploadFile} className="hidden" id="file-upload" />
+                  <label htmlFor="file-upload"
+                    className="inline-flex items-center gap-2 border border-slate-300 text-slate-700 text-sm font-medium px-4 py-2 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors">
+                    {uploading ? 'Uploading…' : '+ Attach File'}
+                  </label>
+                  <span className="text-xs text-slate-400 ml-2">Max 10 MB</span>
+                </div>
+              )}
             </div>
 
             {/* History */}
@@ -368,9 +377,11 @@ export default function TicketDetailPage() {
               <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Status</h3>
               <div className="space-y-1.5">
                 {statuses.map((s) => (
-                  <button key={s.slug} disabled={saving || ticket.status === s.slug} onClick={() => updateStatus(s.slug)}
+                  <button key={s.slug}
+                    disabled={isViewer || saving || ticket.status === s.slug}
+                    onClick={() => !isViewer && updateStatus(s.slug)}
                     className={`w-full text-left text-sm px-3 py-2 rounded-lg transition-colors font-medium ${
-                      ticket.status === s.slug ? s.color_class + ' ring-1 ring-current' : 'text-slate-600 hover:bg-slate-50'
+                      ticket.status === s.slug ? s.color_class + ' ring-1 ring-current' : isViewer ? 'text-slate-400 cursor-default' : 'text-slate-600 hover:bg-slate-50'
                     }`}>
                     {s.label}
                   </button>
@@ -379,7 +390,7 @@ export default function TicketDetailPage() {
             </div>
 
             {/* Notification frequency */}
-            <div className="bg-white border border-slate-200 rounded-xl p-4">
+            {!isViewer && <div className="bg-white border border-slate-200 rounded-xl p-4">
               <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Reminder Alerts</h3>
               <select
                 value={ticket.notification_frequency}
@@ -399,7 +410,7 @@ export default function TicketDetailPage() {
                 <option value="twice_daily">Twice daily</option>
               </select>
               <p className="text-xs text-slate-400 mt-2">Sends a reminder email to the helpdesk team until this ticket is resolved.</p>
-            </div>
+            </div>}
 
             {/* Details */}
             <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">

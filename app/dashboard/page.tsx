@@ -7,6 +7,7 @@ import type { Priority } from '@/lib/utils';
 import Link from 'next/link';
 import { useStatuses, statusColor, statusLabel } from '@/lib/useStatuses';
 import type { TicketStatus } from '@/lib/useStatuses';
+import { useSession } from 'next-auth/react';
 
 interface StatusCount { status: string; count: string; }
 interface ByPriority { priority: string; count: string; }
@@ -16,6 +17,8 @@ interface RecentTicket {
 }
 
 export default function DashboardPage() {
+  const { data: session } = useSession();
+  const isViewer = (session?.user as { role?: string })?.role === 'viewer';
   const statuses = useStatuses();
   const [total, setTotal] = useState(0);
   const [statusCounts, setStatusCounts] = useState<StatusCount[]>([]);
@@ -46,9 +49,11 @@ export default function DashboardPage() {
       <div className="max-w-5xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-          <Link href="/tickets/new" className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
-            + New Ticket
-          </Link>
+          {!isViewer && (
+            <Link href="/tickets/new" className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+              + New Ticket
+            </Link>
+          )}
         </div>
 
         {/* Total card */}

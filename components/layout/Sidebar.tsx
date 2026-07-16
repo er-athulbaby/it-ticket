@@ -8,14 +8,14 @@ import { useSettings } from '@/lib/useSettings';
 import { getTheme } from '@/lib/themes';
 import { useState } from 'react';
 
-const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: '◈' },
-  { href: '/tickets', label: 'Tickets', icon: '🎫' },
-  { href: '/categories', label: 'Categories', icon: '🏷️' },
-  { href: '/staff', label: 'Staff', icon: '👤' },
-  { href: '/associations', label: 'Associations', icon: '🏢' },
-  { href: '/users', label: 'Users', icon: '👥' },
-  { href: '/settings', label: 'Settings', icon: '⚙️' },
+const ALL_NAV = [
+  { href: '/dashboard', label: 'Dashboard', icon: '◈', viewerOk: true },
+  { href: '/tickets', label: 'Tickets', icon: '🎫', viewerOk: true },
+  { href: '/categories', label: 'Categories', icon: '🏷️', viewerOk: false },
+  { href: '/staff', label: 'Staff', icon: '👤', viewerOk: false },
+  { href: '/associations', label: 'Associations', icon: '🏢', viewerOk: false },
+  { href: '/users', label: 'Users', icon: '👥', viewerOk: false },
+  { href: '/settings', label: 'Settings', icon: '⚙️', viewerOk: false },
 ];
 
 export default function Sidebar({ onClose }: { onClose?: () => void }) {
@@ -28,6 +28,8 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
   const rawId = (session?.user as { id?: string })?.id ?? '';
   const adminId = rawId.replace('admin_', '');
   const photoUrl = adminId ? `/api/users/photo?adminId=${adminId}` : '';
+  const isViewer = (session?.user as { role?: string })?.role === 'viewer';
+  const navItems = ALL_NAV.filter((item) => !isViewer || item.viewerOk);
 
   return (
     <div className={cn('flex flex-col h-full text-white w-64', theme.sidebar)}>

@@ -202,6 +202,7 @@ export default function UsersPage() {
                   >
                     <option value="agent">Agent</option>
                     <option value="superadmin">Super Admin</option>
+                    <option value="viewer">Viewer (read-only)</option>
                   </select>
                 </div>
               </div>
@@ -243,8 +244,11 @@ export default function UsersPage() {
                       {!u.is_active && (
                         <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">Inactive</span>
                       )}
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${u.role === 'superadmin' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'}`}>
-                        {u.role}
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${
+                        u.role === 'superadmin' ? 'bg-indigo-100 text-indigo-700' :
+                        u.role === 'viewer' ? 'bg-amber-100 text-amber-700' :
+                        'bg-slate-100 text-slate-600'}`}>
+                        {u.role === 'viewer' ? 'Viewer' : u.role === 'superadmin' ? 'Super Admin' : 'Agent'}
                       </span>
                     </div>
                     <div className="text-sm text-slate-500">{u.email}</div>

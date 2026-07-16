@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 
 const STAFF_ALLOWED = ['/my-tickets', '/profile', '/api/staff-portal', '/api/profile', '/api/categories', '/api/staff'];
+const VIEWER_ALLOWED = ['/dashboard', '/tickets', '/api/dashboard', '/api/tickets', '/api/ticket-statuses', '/api/categories', '/api/users/photo', '/api/associations'];
 const PUBLIC = ['/login', '/api/auth', '/api/settings'];
 
 export async function middleware(req: NextRequest) {
@@ -17,12 +18,20 @@ export async function middleware(req: NextRequest) {
   }
 
   const userType = token.userType as string;
+  const role = token.role as string;
   const isStaff = userType === 'staff';
   const isAdmin = userType === 'admin';
+  const isViewer = isAdmin && role === 'viewer';
 
   // After login redirect
   if (pathname === '/login') {
     return NextResponse.redirect(new URL(isStaff ? '/my-tickets' : '/dashboard', req.url));
+  }
+
+  // Viewer trying to access non-viewer pages
+  if (isViewer) {
+    const allowed = VIEWER_ALLOWED.some((p) => pathname === p || pathname.startsWith(p + '/') || pathname.startsWith(p));
+    if (!allowed) return NextResponse.redirect(new URL('/dashboard', req.url));
   }
 
   // Staff trying to access admin pages
