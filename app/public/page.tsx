@@ -40,31 +40,37 @@ export default function PublicTicketPage() {
     if (!captcha) return;
 
     setSubmitting(true);
-    const res = await fetch('/api/public/submit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        requester_id: parseInt(form.requester_id),
-        title: form.title,
-        description: form.description,
-        captcha_answer: form.captcha_answer,
-        captcha_token: captcha.token,
-      }),
-    });
+    try {
+      const res = await fetch('/api/public/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requester_id: parseInt(form.requester_id),
+          title: form.title,
+          description: form.description,
+          captcha_answer: form.captcha_answer,
+          captcha_token: captcha.token,
+        }),
+      });
 
-    const data = await res.json();
-    setSubmitting(false);
+      const data = await res.json();
 
-    if (!res.ok) {
-      setError(data.error || 'Submission failed. Please try again.');
+      if (!res.ok) {
+        setError(data.error || 'Submission failed. Please try again.');
+        await loadCaptcha();
+        return;
+      }
+
+      setSuccess(data.ticket_number);
+      setForm({ requester_id: '', title: '', description: '', captcha_answer: '' });
       await loadCaptcha();
-      return;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch {
+      setError('Network error. Please try again.');
+      await loadCaptcha();
+    } finally {
+      setSubmitting(false);
     }
-
-    setSuccess(data.ticket_number);
-    setForm({ requester_id: '', title: '', description: '', captcha_answer: '' });
-    await loadCaptcha();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   const company = settings.company_name || 'HelpDesk';
