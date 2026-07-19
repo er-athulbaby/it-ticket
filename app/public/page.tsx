@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 
 interface StaffMember { id: number; name: string; department: string | null }
 interface Settings { company_name?: string; logo_filename?: string }
@@ -10,9 +10,12 @@ export default function PublicTicketPage() {
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [captcha, setCaptcha] = useState<{ question: string; token: string } | null>(null);
   const [form, setForm] = useState({ requester_id: '', title: '', description: '', captcha_answer: '' });
+  const [nameQuery, setNameQuery] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const nameRef = useRef<HTMLDivElement>(null);
 
   const loadCaptcha = useCallback(async () => {
     const res = await fetch('/api/public/captcha');
@@ -26,17 +29,37 @@ export default function PublicTicketPage() {
     loadCaptcha();
   }, [loadCaptcha]);
 
-  const deptGroups = staff.reduce<Record<string, StaffMember[]>>((acc, s) => {
-    const dept = s.department || 'Other';
-    if (!acc[dept]) acc[dept] = [];
-    acc[dept].push(s);
-    return acc;
-  }, {});
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (nameRef.current && !nameRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  const suggestions = nameQuery.trim().length > 0
+    ? staff.filter((s) => s.name.toLowerCase().includes(nameQuery.toLowerCase()))
+    : [];
+
+  function selectStaff(s: StaffMember) {
+    setNameQuery(s.name);
+    setForm((f) => ({ ...f, requester_id: String(s.id) }));
+    setShowSuggestions(false);
+  }
+
+  function handleNameChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setNameQuery(e.target.value);
+    setForm((f) => ({ ...f, requester_id: '' }));
+    setShowSuggestions(true);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
-    if (!form.requester_id) { setError('Please select your name'); return; }
+    if (!form.requester_id) { setError('Please select your name from the list'); return; }
     if (!captcha) return;
 
     setSubmitting(true);
@@ -63,6 +86,7 @@ export default function PublicTicketPage() {
 
       setSuccess(data.ticket_number);
       setForm({ requester_id: '', title: '', description: '', captcha_answer: '' });
+      setNameQuery('');
       await loadCaptcha();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch {
@@ -79,16 +103,16 @@ export default function PublicTicketPage() {
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
       <div className="bg-white border-b border-slate-200">
-        <div className="max-w-xl mx-auto px-4 py-4 flex items-center gap-3">
+        <div className="max-w-xl mx-auto px-4 py-5 flex items-center gap-4">
           {settings.logo_filename ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src="/api/settings/logo" alt="Logo" className="w-9 h-9 rounded-lg object-contain" />
+            <img src="/api/settings/logo" alt="Logo" className="w-20 h-20 rounded-xl object-contain" />
           ) : (
-            <div className="w-9 h-9 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+            <div className="w-20 h-20 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-bold text-2xl">
               {company.slice(0, 2).toUpperCase()}
             </div>
           )}
-          <span className="font-semibold text-slate-800">{company}</span>
+          <span className="font-semibold text-slate-800 text-lg">{company}</span>
         </div>
       </div>
 
@@ -114,26 +138,58 @@ export default function PublicTicketPage() {
         <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
           <form onSubmit={handleSubmit} className="space-y-5">
 
-            {/* Name */}
+            {/* Name search */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">
                 Your Name <span className="text-red-500">*</span>
               </label>
-              <select
-                required
-                value={form.requester_id}
-                onChange={(e) => setForm((f) => ({ ...f, requester_id: e.target.value }))}
-                className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
-              >
-                <option value="">— Select your name —</option>
-                {Object.entries(deptGroups).map(([dept, members]) => (
-                  <optgroup key={dept} label={dept}>
-                    {members.map((s) => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
+              <div className="relative" ref={nameRef}>
+                <input
+                  type="text"
+                  autoComplete="off"
+                  placeholder="Type your name to search…"
+                  value={nameQuery}
+                  onChange={handleNameChange}
+                  onFocus={() => { if (nameQuery.trim()) setShowSuggestions(true); }}
+                  className={`w-full px-3.5 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                    form.requester_id ? 'border-indigo-400 bg-indigo-50' : 'border-slate-300 bg-white'
+                  }`}
+                />
+                {form.requester_id && (
+                  <button
+                    type="button"
+                    onClick={() => { setNameQuery(''); setForm((f) => ({ ...f, requester_id: '' })); }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-lg leading-none"
+                  >
+                    ×
+                  </button>
+                )}
+                {showSuggestions && suggestions.length > 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                    {suggestions.map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onMouseDown={() => selectStaff(s)}
+                        className="w-full text-left px-4 py-2.5 text-sm hover:bg-indigo-50 flex items-center justify-between"
+                      >
+                        <span className="font-medium text-slate-800">{s.name}</span>
+                        {s.department && (
+                          <span className="text-xs text-slate-400">{s.department}</span>
+                        )}
+                      </button>
                     ))}
-                  </optgroup>
-                ))}
-              </select>
+                  </div>
+                )}
+                {showSuggestions && nameQuery.trim().length > 0 && suggestions.length === 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg px-4 py-3 text-sm text-slate-400">
+                    No matching names found
+                  </div>
+                )}
+              </div>
+              {form.requester_id && (
+                <p className="text-xs text-indigo-600 mt-1">✓ Name selected</p>
+              )}
             </div>
 
             {/* Title */}
