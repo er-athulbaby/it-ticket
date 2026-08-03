@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "seed:tickets": "ts-node --project tsconfig.json scripts/seed-tickets.ts"
   },
   "dependencies": {
     "@types/bcryptjs": "^2.4.6",
