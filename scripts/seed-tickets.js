@@ -92,8 +92,21 @@ async function main() {
     process.exit(1);
   }
 
+  // Find "Hardware" category
+  const { rows: catRows } = await pool.query(
+    `SELECT id, name FROM categories WHERE name ILIKE 'hardware' LIMIT 1`
+  );
+  const hardwareCat = catRows[0] || null;
+  if (!hardwareCat) {
+    console.warn('WARNING: "Hardware" category not found — tickets will be created without a category.');
+    console.warn('Available categories:');
+    const { rows: cats } = await pool.query('SELECT name FROM categories ORDER BY name');
+    cats.forEach((c) => console.warn(`  - ${c.name}`));
+  }
+
   console.log(`Ticket 1 assigned to: ${athul.name} (id ${athul.id})`);
   console.log(`Ticket 2 assigned to: ${rafiq.name} (id ${rafiq.id})`);
+  console.log(`Category: ${hardwareCat ? hardwareCat.name + ' (id ' + hardwareCat.id + ')' : 'none'}`);
   console.log('');
 
   // Get ticket prefix + counter from app_settings
@@ -134,18 +147,18 @@ async function main() {
     counter++;
     const tn1 = `${prefix}-${String(counter).padStart(5, '0')}`;
     await pool.query(
-      `INSERT INTO tickets (ticket_number, title, description, priority, status, requester_id, assigned_to)
-       VALUES ($1, $2, '', 'medium', 'open', $3, $4)`,
-      [tn1, 'Installation and setup of new PC', staffId, athul.id]
+      `INSERT INTO tickets (ticket_number, title, description, priority, status, requester_id, assigned_to, category_id)
+       VALUES ($1, $2, '', 'medium', 'open', $3, $4, $5)`,
+      [tn1, 'Installation and setup of new PC', staffId, athul.id, hardwareCat ? hardwareCat.id : null]
     );
 
     // Ticket 2 — Configuration
     counter++;
     const tn2 = `${prefix}-${String(counter).padStart(5, '0')}`;
     await pool.query(
-      `INSERT INTO tickets (ticket_number, title, description, priority, status, requester_id, assigned_to)
-       VALUES ($1, $2, '', 'medium', 'open', $3, $4)`,
-      [tn2, 'Configuration of new PC', staffId, rafiq.id]
+      `INSERT INTO tickets (ticket_number, title, description, priority, status, requester_id, assigned_to, category_id)
+       VALUES ($1, $2, '', 'medium', 'open', $3, $4, $5)`,
+      [tn2, 'Configuration of new PC', staffId, rafiq.id, hardwareCat ? hardwareCat.id : null]
     );
 
     console.log(`  ${tn1} + ${tn2}  →  ${name}`);
