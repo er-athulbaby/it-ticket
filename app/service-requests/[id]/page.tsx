@@ -1,21 +1,17 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import AppLayout from '@/components/layout/AppLayout';
 
-interface AssetRow { item: string; make: string; model: string; serial: string; tag: string }
+interface AssetRow { asset_id: number | null; item: string; make: string; model: string; serial: string; tag: string }
 
 interface SR {
   id: number; request_number: string; status: string;
   staff_name: string | null; association_name: string | null; created_by_name: string | null;
   employee_name: string | null; cpr_no: string | null; department: string | null;
-  mobile_no: string | null; tel_no: string | null; fax_no: string | null;
-  address: string | null; company: string | null;
-  it_username: string | null; it_domain_id: string | null; it_security_group: string | null;
-  it_membership: string | null; it_access_permissions: string | null;
-  it_map_drives: string | null; it_duration: string | null;
+  mobile_no: string | null;
   asset_details: AssetRow[] | null;
   comments: string | null;
   employee_signed_date: string | null;
@@ -26,6 +22,11 @@ interface SR {
   created_at: string; updated_at: string;
 }
 
+interface AssetOption {
+  id: number; asset_tag: string | null; category_name: string | null;
+  make: string | null; model: string | null; serial_no: string | null;
+}
+
 const STATUS_STYLES: Record<string, string> = {
   pending: 'bg-amber-100 text-amber-700 border-amber-200',
   in_progress: 'bg-blue-100 text-blue-700 border-blue-200',
@@ -34,7 +35,7 @@ const STATUS_STYLES: Record<string, string> = {
 };
 const STATUS_LABELS: Record<string, string> = { pending: 'Pending', in_progress: 'In Progress', completed: 'Completed', cancelled: 'Cancelled' };
 
-const emptyAsset: AssetRow = { item: '', make: '', model: '', serial: '', tag: '' };
+const emptyAsset: AssetRow = { asset_id: null, item: '', make: '', model: '', serial: '', tag: '' };
 
 export default function ServiceRequestDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -44,8 +45,8 @@ export default function ServiceRequestDetailPage() {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<Partial<SR>>({});
   const [assets, setAssets] = useState<AssetRow[]>([]);
+  const [assetOptions, setAssetOptions] = useState<AssetOption[]>([]);
   const [saving, setSaving] = useState(false);
-  const printRef = useRef<HTMLDivElement>(null);
 
   async function load() {
     const res = await fetch(`/api/service-requests/${id}`);
@@ -57,7 +58,10 @@ export default function ServiceRequestDetailPage() {
     setLoading(false);
   }
 
-  useEffect(() => { load(); }, [id]);
+  useEffect(() => {
+    load();
+    fetch('/api/assets').then(r => r.json()).then(setAssetOptions);
+  }, [id]);
 
   async function save() {
     setSaving(true);
@@ -79,7 +83,15 @@ export default function ServiceRequestDetailPage() {
   function printForm() { window.print(); }
 
   function ff(k: keyof SR, v: string) { setForm(prev => ({ ...prev, [k]: v || null })); }
-  function fa(idx: number, k: keyof AssetRow, v: string) { setAssets(prev => prev.map((a, i) => i === idx ? { ...a, [k]: v } : a)); }
+
+  function selectAsset(idx: number, assetId: string) {
+    const a = assetOptions.find(x => x.id === Number(assetId));
+    setAssets(prev => prev.map((row, i) => {
+      if (i !== idx) return row;
+      if (!a) return emptyAsset;
+      return { asset_id: a.id, item: a.category_name || '', make: a.make || '', model: a.model || '', serial: a.serial_no || '', tag: a.asset_tag || '' };
+    }));
+  }
 
   if (loading) return <AppLayout><div className="flex items-center justify-center h-64 text-slate-400">Loading…</div></AppLayout>;
   if (!sr) return null;
@@ -141,20 +153,7 @@ export default function ServiceRequestDetailPage() {
             <div>
               <h3 className="font-semibold text-slate-800 mb-3">Employee Details</h3>
               <div className="grid grid-cols-2 gap-4">
-                {([['employee_name','Employee Name'],['cpr_no','CPR No.'],['department','Department'],['mobile_no','Mobile'],['tel_no','Tel'],['fax_no','Fax'],['address','Address'],['company','Company']] as [keyof SR, string][]).map(([k,l]) => (
-                  <div key={k} className={k === 'address' ? 'col-span-2' : ''}>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">{l}</label>
-                    <input type="text" value={(form[k] as string) || ''} onChange={(e) => ff(k, e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <h3 className="font-semibold text-slate-800 mb-3">IT Details</h3>
-              <div className="grid grid-cols-2 gap-4">
-                {([['it_username','Username'],['it_domain_id','Domain ID'],['it_security_group','Security Group'],['it_membership','Membership'],['it_access_permissions','Access Permissions'],['it_map_drives','Map Drives'],['it_duration','Duration']] as [keyof SR, string][]).map(([k,l]) => (
+                {([['employee_name','Employee Name'],['cpr_no','CPR No.'],['department','Department'],['mobile_no','Mobile']] as [keyof SR, string][]).map(([k,l]) => (
                   <div key={k}>
                     <label className="block text-xs font-medium text-slate-600 mb-1">{l}</label>
                     <input type="text" value={(form[k] as string) || ''} onChange={(e) => ff(k, e.target.value)}
@@ -169,17 +168,27 @@ export default function ServiceRequestDetailPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-xs border border-slate-200 rounded-lg">
                   <thead className="bg-slate-50">
-                    <tr>{['Item/Type','Make','Model','Serial No.','Asset Tag'].map(h => <th key={h} className="px-3 py-2 text-left font-medium text-slate-600 border-b border-slate-200">{h}</th>)}</tr>
+                    <tr>{['Select Asset','Item/Type','Make','Model','Serial No.','Asset Tag'].map(h => <th key={h} className="px-3 py-2 text-left font-medium text-slate-600 border-b border-slate-200">{h}</th>)}</tr>
                   </thead>
                   <tbody>
                     {assets.map((a, i) => (
                       <tr key={i} className="border-b border-slate-100 last:border-0">
-                        {(['item','make','model','serial','tag'] as (keyof AssetRow)[]).map(k => (
-                          <td key={k} className="px-2 py-1">
-                            <input type="text" value={a[k]} onChange={(e) => fa(i, k, e.target.value)}
-                              className="w-full px-2 py-1.5 border border-slate-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500" />
-                          </td>
-                        ))}
+                        <td className="px-2 py-1">
+                          <select value={a.asset_id ?? ''} onChange={(e) => selectAsset(i, e.target.value)}
+                            className="w-full px-2 py-1.5 border border-slate-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white">
+                            <option value="">— None —</option>
+                            {assetOptions.map(opt => (
+                              <option key={opt.id} value={opt.id}>
+                                {[opt.asset_tag, opt.category_name, opt.make, opt.model].filter(Boolean).join(' · ')}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-2 py-1.5 text-slate-600">{a.item || '—'}</td>
+                        <td className="px-2 py-1.5 text-slate-600">{a.make || '—'}</td>
+                        <td className="px-2 py-1.5 text-slate-600">{a.model || '—'}</td>
+                        <td className="px-2 py-1.5 text-slate-600 font-mono">{a.serial || '—'}</td>
+                        <td className="px-2 py-1.5 text-slate-600 font-mono">{a.tag || '—'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -211,15 +220,7 @@ export default function ServiceRequestDetailPage() {
             <div className="bg-white border border-slate-200 rounded-xl p-6">
               <h3 className="font-semibold text-slate-800 mb-4">Employee Details</h3>
               <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-                {[['Employee Name', sr.employee_name],['CPR No.', sr.cpr_no],['Department', sr.department],['Mobile', sr.mobile_no],['Tel', sr.tel_no],['Fax', sr.fax_no],['Address', sr.address],['Company', sr.company]].map(([l,v]) => (
-                  <div key={l}><dt className="text-xs text-slate-500 font-medium">{l}</dt><dd className="text-slate-900 mt-0.5">{v || '—'}</dd></div>
-                ))}
-              </dl>
-            </div>
-            <div className="bg-white border border-slate-200 rounded-xl p-6">
-              <h3 className="font-semibold text-slate-800 mb-4">IT Details</h3>
-              <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-                {[['Username', sr.it_username],['Domain ID', sr.it_domain_id],['Security Group', sr.it_security_group],['Membership', sr.it_membership],['Access Permissions', sr.it_access_permissions],['Map Drives', sr.it_map_drives],['Duration', sr.it_duration]].map(([l,v]) => (
+                {[['Employee Name', sr.employee_name],['CPR No.', sr.cpr_no],['Department', sr.department],['Mobile', sr.mobile_no]].map(([l,v]) => (
                   <div key={l}><dt className="text-xs text-slate-500 font-medium">{l}</dt><dd className="text-slate-900 mt-0.5">{v || '—'}</dd></div>
                 ))}
               </dl>
@@ -255,7 +256,7 @@ export default function ServiceRequestDetailPage() {
       </div>
 
       {/* Print-only BOC form */}
-      <div id="print-form" ref={printRef} style={{ display: 'none', fontFamily: 'Arial, sans-serif', fontSize: '11px', color: '#000' }}>
+      <div id="print-form" style={{ display: 'none', fontFamily: 'Arial, sans-serif', fontSize: '11px', color: '#000' }}>
         <style>{`
           @media print {
             #print-form { display: block !important; }
@@ -263,7 +264,8 @@ export default function ServiceRequestDetailPage() {
             .pf-table td, .pf-table th { border: 1px solid #000; padding: 4px 6px; vertical-align: top; }
             .pf-label { background: #f0f0f0; font-weight: bold; width: 130px; }
             .pf-section { font-weight: bold; font-size: 12px; margin: 10px 0 4px; text-transform: uppercase; letter-spacing: 0.5px; }
-            .pf-header { text-align: center; margin-bottom: 12px; }
+            .pf-header { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 12px; text-align: center; }
+            .pf-header img { height: 48px; width: auto; object-fit: contain; }
             .pf-header h1 { font-size: 16px; font-weight: bold; margin: 0; }
             .pf-header p { margin: 2px 0; font-size: 11px; }
             .pf-sig-table td { height: 40px; }
@@ -271,27 +273,19 @@ export default function ServiceRequestDetailPage() {
         `}</style>
 
         <div className="pf-header">
-          <h1>IT SERVICE CHANGE REQUEST</h1>
-          <p>Request Number: <strong>{sr.request_number}</strong> &nbsp;&nbsp; Date: {sr.created_at ? new Date(sr.created_at).toLocaleDateString() : ''}</p>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/api/settings/logo" alt="Logo" />
+          <div>
+            <h1>IT SERVICE CHANGE REQUEST</h1>
+            <p>Request Number: <strong>{sr.request_number}</strong> &nbsp;&nbsp; Date: {sr.created_at ? new Date(sr.created_at).toLocaleDateString() : ''}</p>
+          </div>
         </div>
 
         <div className="pf-section">Employee Details</div>
         <table className="pf-table">
           <tbody>
             <tr><td className="pf-label">Employee Name</td><td>{sr.employee_name || ''}</td><td className="pf-label">CPR No.</td><td>{sr.cpr_no || ''}</td></tr>
-            <tr><td className="pf-label">Department</td><td>{sr.department || ''}</td><td className="pf-label">Company</td><td>{sr.company || ''}</td></tr>
-            <tr><td className="pf-label">Mobile</td><td>{sr.mobile_no || ''}</td><td className="pf-label">Tel</td><td>{sr.tel_no || ''}</td></tr>
-            <tr><td className="pf-label">Fax</td><td>{sr.fax_no || ''}</td><td className="pf-label">Address</td><td>{sr.address || ''}</td></tr>
-          </tbody>
-        </table>
-
-        <div className="pf-section">IT Details</div>
-        <table className="pf-table">
-          <tbody>
-            <tr><td className="pf-label">IT Username</td><td>{sr.it_username || ''}</td><td className="pf-label">Domain ID</td><td>{sr.it_domain_id || ''}</td></tr>
-            <tr><td className="pf-label">Security Group</td><td>{sr.it_security_group || ''}</td><td className="pf-label">Membership</td><td>{sr.it_membership || ''}</td></tr>
-            <tr><td className="pf-label">Access Permissions</td><td>{sr.it_access_permissions || ''}</td><td className="pf-label">Map Drives</td><td>{sr.it_map_drives || ''}</td></tr>
-            <tr><td className="pf-label">Duration</td><td colSpan={3}>{sr.it_duration || ''}</td></tr>
+            <tr><td className="pf-label">Department</td><td>{sr.department || ''}</td><td className="pf-label">Mobile</td><td>{sr.mobile_no || ''}</td></tr>
           </tbody>
         </table>
 

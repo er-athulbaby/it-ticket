@@ -21,10 +21,7 @@ const STATUS_LABELS: Record<string, string> = { pending: 'Pending', in_progress:
 
 const emptyForm = {
   staff_id: '', association_id: '',
-  employee_name: '', cpr_no: '', department: '', mobile_no: '', tel_no: '', fax_no: '',
-  address: '', company: '',
-  it_username: '', it_domain_id: '', it_security_group: '', it_membership: '',
-  it_access_permissions: '', it_map_drives: '', it_duration: '',
+  employee_name: '', cpr_no: '', department: '', mobile_no: '',
 };
 
 interface Recipient { id: number; name: string }
@@ -168,12 +165,6 @@ export default function ServiceRequestsPage() {
                   {k:'cpr_no',l:'CPR No.',ph:''},
                   {k:'department',l:'Department',ph:''},
                   {k:'mobile_no',l:'Mobile',ph:''},
-                  {k:'tel_no',l:'Tel',ph:''},
-                  {k:'fax_no',l:'Fax',ph:''},
-                  {k:'company',l:'Company',ph:''},
-                  {k:'it_username',l:'IT Username',ph:''},
-                  {k:'it_domain_id',l:'Domain ID',ph:''},
-                  {k:'it_duration',l:'Duration',ph:'e.g. Permanent'},
                 ].map(({k,l,ph}) => (
                   <div key={k}>
                     <label className="block text-sm font-medium text-slate-700 mb-1.5">{l}</label>
@@ -181,11 +172,6 @@ export default function ServiceRequestsPage() {
                       className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
                   </div>
                 ))}
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Address</label>
-                  <input type="text" value={form.address} onChange={(e) => f('address', e.target.value)}
-                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                </div>
               </div>
 
               <div className="flex gap-3 mt-6">
