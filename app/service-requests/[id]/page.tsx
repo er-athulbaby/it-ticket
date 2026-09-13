@@ -26,6 +26,7 @@ interface SR {
 interface AssetOption {
   id: number; asset_tag: string | null; category_name: string | null;
   make: string | null; model: string | null; serial_no: string | null;
+  assigned_to_name: string | null;
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -195,11 +196,13 @@ export default function ServiceRequestDetailPage() {
                           <select value={a.asset_id ?? ''} onChange={(e) => selectAsset(i, e.target.value)}
                             className="w-full px-2 py-1.5 border border-slate-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white">
                             <option value="">— None —</option>
-                            {assetOptions.map(opt => (
-                              <option key={opt.id} value={opt.id}>
-                                {[opt.asset_tag, opt.category_name, opt.make, opt.model].filter(Boolean).join(' · ')}
-                              </option>
-                            ))}
+                            {assetOptions
+                              .filter(opt => !opt.assigned_to_name || opt.id === a.asset_id)
+                              .map(opt => (
+                                <option key={opt.id} value={opt.id}>
+                                  {[opt.asset_tag, opt.category_name, opt.make, opt.model].filter(Boolean).join(' · ')}
+                                </option>
+                              ))}
                           </select>
                         </td>
                         <td className="px-2 py-1.5 text-slate-600">{a.item || '—'}</td>
@@ -238,7 +241,7 @@ export default function ServiceRequestDetailPage() {
             <div className="bg-white border border-slate-200 rounded-xl p-6">
               <h3 className="font-semibold text-slate-800 mb-4">Employee Details</h3>
               <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-                {[['Employee Name', sr.employee_name],['CPR No.', sr.cpr_no],['Department', sr.department],['Mobile', sr.mobile_no]].map(([l,v]) => (
+                {[['Employee Name', sr.employee_name],['CPR No.', sr.cpr_no],['Department', sr.department],['Mobile', sr.mobile_no],['Association', sr.association_name]].map(([l,v]) => (
                   <div key={l}><dt className="text-xs text-slate-500 font-medium">{l}</dt><dd className="text-slate-900 mt-0.5">{v || '—'}</dd></div>
                 ))}
               </dl>
@@ -304,6 +307,9 @@ export default function ServiceRequestDetailPage() {
           <tbody>
             <tr><td className="pf-label">Employee Name</td><td>{sr.employee_name || ''}</td><td className="pf-label">CPR No.</td><td>{sr.cpr_no || ''}</td></tr>
             <tr><td className="pf-label">Department</td><td>{sr.department || ''}</td><td className="pf-label">Mobile</td><td>{sr.mobile_no || ''}</td></tr>
+            {sr.association_name && (
+              <tr><td className="pf-label">Association</td><td colSpan={3}>{sr.association_name}</td></tr>
+            )}
           </tbody>
         </table>
 
