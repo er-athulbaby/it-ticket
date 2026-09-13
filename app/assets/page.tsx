@@ -255,6 +255,7 @@ export default function AssetsPage() {
                       {ASSET_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                     </select>
                   </div>
+                  {categories.length > 0 && (
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1.5">Category</label>
                     <select value={form.category_id} onChange={(e) => setForm((f) => ({ ...f, category_id: e.target.value }))}
@@ -263,6 +264,7 @@ export default function AssetsPage() {
                       {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                   </div>
+                  )}
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1.5">Asset Tag</label>
                     <input type="text" placeholder="e.g. BOC-PC-001" value={form.asset_tag}
