@@ -14,6 +14,7 @@ const ALL_NAV = [
   { href: '/categories', label: 'Categories', icon: '🏷️', viewerOk: false },
   { href: '/staff', label: 'Staff', icon: '👤', viewerOk: false },
   { href: '/associations', label: 'Associations', icon: '🏢', viewerOk: false },
+  { href: '/assets', label: 'Assets', icon: '🖥️', viewerOk: false },
   { href: '/users', label: 'Users', icon: '👥', viewerOk: false },
   { href: '/settings', label: 'Settings', icon: '⚙️', viewerOk: false },
 ];
