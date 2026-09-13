@@ -8,7 +8,6 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const search = searchParams.get('search') || '';
-  const type = searchParams.get('type') || '';
   const condition = searchParams.get('condition') || '';
   const category = searchParams.get('category') || '';
 
@@ -20,7 +19,6 @@ export async function GET(req: NextRequest) {
     conditions.push(`(a.asset_tag ILIKE $${p} OR a.make ILIKE $${p} OR a.model ILIKE $${p} OR a.serial_no ILIKE $${p})`);
     params.push(`%${search}%`); p++;
   }
-  if (type) { conditions.push(`a.asset_type = $${p++}`); params.push(type); }
   if (condition) { conditions.push(`a.condition = $${p++}`); params.push(condition); }
   if (category) { conditions.push(`a.category_id = $${p++}`); params.push(Number(category)); }
 
@@ -57,16 +55,16 @@ export async function POST(req: NextRequest) {
   if ((session.user as { role?: string }).role === 'viewer') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const body = await req.json();
-  const { asset_type, asset_tag, make, model, serial_no, fru_part_no, condition, purchase_date, warranty_expiry, notes, category_id } = body;
+  const { asset_tag, make, model, serial_no, fru_part_no, condition, purchase_date, warranty_expiry, notes, category_id } = body;
 
-  if (!asset_type) return NextResponse.json({ error: 'Asset type is required' }, { status: 400 });
+  if (!category_id) return NextResponse.json({ error: 'Category is required' }, { status: 400 });
 
   const asset = await queryOne(`
-    INSERT INTO assets (asset_type, asset_tag, make, model, serial_no, fru_part_no, condition, purchase_date, warranty_expiry, notes, category_id)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    INSERT INTO assets (category_id, asset_tag, make, model, serial_no, fru_part_no, condition, purchase_date, warranty_expiry, notes)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
     RETURNING *
   `, [
-    asset_type,
+    Number(category_id),
     asset_tag?.trim() || null,
     make?.trim() || null,
     model?.trim() || null,
@@ -76,7 +74,6 @@ export async function POST(req: NextRequest) {
     purchase_date || null,
     warranty_expiry || null,
     notes?.trim() || null,
-    category_id ? Number(category_id) : null,
   ]);
 
   return NextResponse.json(asset, { status: 201 });

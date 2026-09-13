@@ -5,17 +5,7 @@ import { useRouter } from 'next/navigation';
 import AppLayout from '@/components/layout/AppLayout';
 import Link from 'next/link';
 
-const ASSET_TYPES = [
-  'Desktop Computer', 'Laptop', 'Monitor', 'Printer', 'Phone / Mobile',
-  'Tablet', 'Server', 'Network Device', 'UPS', 'Keyboard', 'Mouse', 'Other',
-];
-
-const ASSET_TYPE_ICONS: Record<string, string> = {
-  'Desktop Computer': '🖥️', 'Laptop': '💻', 'Monitor': '🖥️',
-  'Printer': '🖨️', 'Phone / Mobile': '📱', 'Tablet': '📱',
-  'Server': '🗄️', 'Network Device': '🔌', 'UPS': '🔋',
-  'Keyboard': '⌨️', 'Mouse': '🖱️', 'Other': '📦',
-};
+interface AssetCategory { id: number; name: string; color: string }
 
 const CONDITIONS = ['new', 'good', 'fair', 'poor', 'retired'];
 
@@ -28,7 +18,8 @@ const CONDITION_STYLES: Record<string, string> = {
 };
 
 interface Asset {
-  id: number; asset_tag: string | null; asset_type: string;
+  id: number; asset_tag: string | null; category_id: number | null;
+  category_name: string | null; category_color: string | null;
   make: string | null; model: string | null; serial_no: string | null;
   fru_part_no: string | null; condition: string;
   purchase_date: string | null; warranty_expiry: string | null;
@@ -60,6 +51,7 @@ export default function AssetDetailPage({ params }: { params: Promise<{ id: stri
   const [editForm, setEditForm] = useState<Partial<Asset>>({});
   const [staff, setStaff] = useState<StaffRow[]>([]);
   const [assocs, setAssocs] = useState<AssocRow[]>([]);
+  const [categories, setCategories] = useState<AssetCategory[]>([]);
   const [showAssign, setShowAssign] = useState(false);
   const [assignForm, setAssignForm] = useState({ type: 'staff', staff_id: '', association_id: '', assigned_date: new Date().toISOString().slice(0, 10), notes: '' });
   const [assigning, setAssigning] = useState(false);
@@ -78,6 +70,7 @@ export default function AssetDetailPage({ params }: { params: Promise<{ id: stri
     load();
     fetch('/api/staff').then((r) => r.json()).then(setStaff);
     fetch('/api/associations').then((r) => r.json()).then(setAssocs);
+    fetch('/api/asset-categories').then((r) => r.json()).then(setCategories);
   }, []); // eslint-disable-line
 
   async function saveEdit() {
@@ -138,7 +131,7 @@ export default function AssetDetailPage({ params }: { params: Promise<{ id: stri
           <Link href="/assets" className="hover:text-indigo-600">Assets</Link>
           <span>/</span>
           <span className="text-slate-900 font-medium">
-            {[asset.make, asset.model].filter(Boolean).join(' ') || asset.asset_type}
+            {[asset.make, asset.model].filter(Boolean).join(' ') || asset.category_name || 'Asset'}
           </span>
         </div>
 
@@ -146,15 +139,15 @@ export default function AssetDetailPage({ params }: { params: Promise<{ id: stri
         <div className="bg-white border border-slate-200 rounded-xl p-6">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-xl bg-indigo-50 flex items-center justify-center text-3xl">
-                {ASSET_TYPE_ICONS[asset.asset_type] || '📦'}
+              <div className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: (asset.category_color || '#6366f1') + '1a' }}>
+                <span className="w-4 h-4 rounded-full" style={{ background: asset.category_color || '#6366f1' }} />
               </div>
               <div>
                 <h1 className="text-xl font-bold text-slate-900">
-                  {[asset.make, asset.model].filter(Boolean).join(' ') || asset.asset_type}
+                  {[asset.make, asset.model].filter(Boolean).join(' ') || asset.category_name || 'Asset'}
                 </h1>
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
-                  <span className="text-sm text-slate-500">{asset.asset_type}</span>
+                  <span className="text-sm text-slate-500">{asset.category_name || 'Uncategorised'}</span>
                   {asset.asset_tag && (
                     <span className="font-mono text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded">{asset.asset_tag}</span>
                   )}
@@ -260,10 +253,10 @@ export default function AssetDetailPage({ params }: { params: Promise<{ id: stri
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Asset Type</label>
-                  <select value={editForm.asset_type || ''} onChange={(e) => setEditForm((f) => ({ ...f, asset_type: e.target.value }))}
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Category</label>
+                  <select value={editForm.category_id || ''} onChange={(e) => setEditForm((f) => ({ ...f, category_id: Number(e.target.value) }))}
                     className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
-                    {ASSET_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                    {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </div>
                 {[

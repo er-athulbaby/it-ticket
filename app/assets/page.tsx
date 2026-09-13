@@ -4,19 +4,7 @@ import { useEffect, useState } from 'react';
 import AppLayout from '@/components/layout/AppLayout';
 import Link from 'next/link';
 
-const ASSET_TYPES = [
-  'Desktop Computer', 'Laptop', 'Monitor', 'Printer', 'Phone / Mobile',
-  'Tablet', 'Server', 'Network Device', 'UPS', 'Keyboard', 'Mouse', 'Other',
-];
-
 interface AssetCategory { id: number; name: string; color: string }
-
-const ASSET_TYPE_ICONS: Record<string, string> = {
-  'Desktop Computer': '🖥️', 'Laptop': '💻', 'Monitor': '🖥️',
-  'Printer': '🖨️', 'Phone / Mobile': '📱', 'Tablet': '📱',
-  'Server': '🗄️', 'Network Device': '🔌', 'UPS': '🔋',
-  'Keyboard': '⌨️', 'Mouse': '🖱️', 'Other': '📦',
-};
 
 const CONDITIONS = ['new', 'good', 'fair', 'poor', 'retired'];
 
@@ -29,7 +17,7 @@ const CONDITION_STYLES: Record<string, string> = {
 };
 
 interface Asset {
-  id: number; asset_tag: string | null; asset_type: string;
+  id: number; asset_tag: string | null;
   make: string | null; model: string | null; serial_no: string | null;
   fru_part_no: string | null; condition: string;
   purchase_date: string | null; warranty_expiry: string | null;
@@ -40,16 +28,15 @@ interface Asset {
 }
 
 const emptyForm = {
-  asset_type: 'Desktop Computer', asset_tag: '', make: '', model: '',
+  category_id: '', asset_tag: '', make: '', model: '',
   serial_no: '', fru_part_no: '', condition: 'good',
-  purchase_date: '', warranty_expiry: '', notes: '', category_id: '',
+  purchase_date: '', warranty_expiry: '', notes: '',
 };
 
 export default function AssetsPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState('');
   const [condFilter, setCondFilter] = useState('');
   const [catFilter, setCatFilter] = useState('');
   const [categories, setCategories] = useState<AssetCategory[]>([]);
@@ -60,7 +47,6 @@ export default function AssetsPage() {
   async function load() {
     const params = new URLSearchParams();
     if (search) params.set('search', search);
-    if (typeFilter) params.set('type', typeFilter);
     if (condFilter) params.set('condition', condFilter);
     if (catFilter) params.set('category', catFilter);
     const res = await fetch(`/api/assets?${params}`);
@@ -72,7 +58,7 @@ export default function AssetsPage() {
     fetch('/api/asset-categories').then(r => r.json()).then(setCategories);
   }, []);
 
-  useEffect(() => { load(); }, [search, typeFilter, condFilter, catFilter]); // eslint-disable-line
+  useEffect(() => { load(); }, [search, condFilter, catFilter]); // eslint-disable-line
 
   async function save() {
     setSaving(true);
@@ -96,8 +82,10 @@ export default function AssetsPage() {
     load();
   }
 
-  const grouped = assets.reduce<Record<string, number>>((acc, a) => {
-    acc[a.asset_type] = (acc[a.asset_type] || 0) + 1;
+  const grouped = assets.reduce<Record<string, { count: number; color: string }>>((acc, a) => {
+    const key = a.category_name || 'Uncategorised';
+    if (!acc[key]) acc[key] = { count: 0, color: a.category_color || '#94a3b8' };
+    acc[key].count++;
     return acc;
   }, {});
 
@@ -120,13 +108,12 @@ export default function AssetsPage() {
         {/* Summary chips */}
         {Object.keys(grouped).length > 0 && (
           <div className="flex gap-2 flex-wrap">
-            {Object.entries(grouped).map(([type, count]) => (
-              <button key={type} onClick={() => setTypeFilter(typeFilter === type ? '' : type)}
-                className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-colors ${
-                  typeFilter === type ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'
-                }`}>
-                {ASSET_TYPE_ICONS[type] || '📦'} {type} · {count}
-              </button>
+            {Object.entries(grouped).map(([name, { count, color }]) => (
+              <span key={name}
+                className="text-xs px-3 py-1.5 rounded-full border font-medium bg-white text-slate-600 border-slate-200 inline-flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full inline-block" style={{ background: color }} />
+                {name} · {count}
+              </span>
             ))}
           </div>
         )}
@@ -136,11 +123,6 @@ export default function AssetsPage() {
           <input type="search" placeholder="Search tag, make, model, serial…"
             value={search} onChange={(e) => setSearch(e.target.value)}
             className="flex-1 min-w-48 px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white" />
-          <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}
-            className="px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
-            <option value="">All types</option>
-            {ASSET_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
           <select value={condFilter} onChange={(e) => setCondFilter(e.target.value)}
             className="px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
             <option value="">All conditions</option>
@@ -182,22 +164,15 @@ export default function AssetsPage() {
                     <tr key={a.id} className="hover:bg-slate-50 transition-colors">
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-2.5">
-                          <span className="text-lg">{ASSET_TYPE_ICONS[a.asset_type] || '📦'}</span>
+                          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: a.category_color || '#94a3b8' }} />
                           <div>
                             <div className="font-medium text-slate-900">
-                              {[a.make, a.model].filter(Boolean).join(' ') || a.asset_type}
+                              {[a.make, a.model].filter(Boolean).join(' ') || a.category_name || 'Asset'}
                             </div>
                             <div className="text-xs text-slate-400 flex items-center gap-1.5 flex-wrap">
                               {a.asset_tag && <span className="font-mono">{a.asset_tag}</span>}
                               {a.asset_tag && <span>·</span>}
-                              <span>{a.asset_type}</span>
-                              {a.category_name && (
-                                <span className="inline-flex items-center gap-1">
-                                  <span>·</span>
-                                  <span className="w-2 h-2 rounded-full inline-block" style={{background: a.category_color || '#6366f1'}} />
-                                  <span>{a.category_name}</span>
-                                </span>
-                              )}
+                              <span>{a.category_name || 'Uncategorised'}</span>
                             </div>
                           </div>
                         </div>
@@ -246,25 +221,23 @@ export default function AssetsPage() {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
             <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
               <h2 className="font-bold text-slate-900 text-lg mb-5">Add Asset</h2>
+              {categories.length === 0 ? (
+                <p className="text-sm text-slate-500">
+                  You need to create at least one category before adding assets.{' '}
+                  <Link href="/assets/categories" className="text-indigo-600 font-medium hover:underline">Add a category →</Link>
+                </p>
+              ) : (
+              <>
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Asset Type <span className="text-red-500">*</span></label>
-                    <select value={form.asset_type} onChange={(e) => setForm((f) => ({ ...f, asset_type: e.target.value }))}
-                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
-                      {ASSET_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                    </select>
-                  </div>
-                  {categories.length > 0 && (
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Category</label>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Category <span className="text-red-500">*</span></label>
                     <select value={form.category_id} onChange={(e) => setForm((f) => ({ ...f, category_id: e.target.value }))}
                       className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
-                      <option value="">No category</option>
+                      <option value="">Select category…</option>
                       {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                   </div>
-                  )}
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1.5">Asset Tag</label>
                     <input type="text" placeholder="e.g. BOC-PC-001" value={form.asset_tag}
@@ -323,7 +296,7 @@ export default function AssetsPage() {
                 </div>
               </div>
               <div className="flex gap-3 mt-6">
-                <button onClick={save} disabled={saving || !form.asset_type}
+                <button onClick={save} disabled={saving || !form.category_id}
                   className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-medium px-5 py-2.5 rounded-lg text-sm">
                   {saving ? 'Saving…' : 'Save Asset'}
                 </button>
@@ -332,6 +305,8 @@ export default function AssetsPage() {
                   Cancel
                 </button>
               </div>
+              </>
+              )}
             </div>
           </div>
         )}

@@ -11,6 +11,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const asset = await queryOne(`
     SELECT
       a.*,
+      ac.name AS category_name, ac.color AS category_color,
       CASE WHEN aa.id IS NOT NULL THEN COALESCE(s.name, assoc.name) END AS assigned_to_name,
       CASE WHEN aa.id IS NOT NULL THEN
         CASE WHEN aa.staff_id IS NOT NULL THEN 'staff' ELSE 'association' END
@@ -21,6 +22,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       aa.assigned_date AS current_assigned_date,
       aa.notes AS current_assignment_notes
     FROM assets a
+    LEFT JOIN asset_categories ac ON a.category_id = ac.id
     LEFT JOIN LATERAL (
       SELECT * FROM asset_assignments
       WHERE asset_id = a.id AND returned_date IS NULL
@@ -64,7 +66,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const set = (col: string, val: unknown) => { setClauses.push(`${col} = $${idx++}`); values.push(val ?? null); };
 
-  if ('asset_type' in body) set('asset_type', body.asset_type);
   if ('asset_tag' in body) set('asset_tag', body.asset_tag?.trim() || null);
   if ('make' in body) set('make', body.make?.trim() || null);
   if ('model' in body) set('model', body.model?.trim() || null);
@@ -74,7 +75,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if ('purchase_date' in body) set('purchase_date', body.purchase_date || null);
   if ('warranty_expiry' in body) set('warranty_expiry', body.warranty_expiry || null);
   if ('notes' in body) set('notes', body.notes?.trim() || null);
-  if ('category_id' in body) set('category_id', body.category_id ? Number(body.category_id) : null);
+  if ('category_id' in body && body.category_id) set('category_id', Number(body.category_id));
 
   if (!setClauses.length) return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
 
