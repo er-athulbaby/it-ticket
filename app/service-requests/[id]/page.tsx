@@ -9,6 +9,7 @@ interface AssetRow { asset_id: number | null; item: string; make: string; model:
 
 interface SR {
   id: number; request_number: string; status: string;
+  staff_id: number | null; association_id: number | null;
   staff_name: string | null; association_name: string | null; created_by_name: string | null;
   employee_name: string | null; cpr_no: string | null; department: string | null;
   mobile_no: string | null;
@@ -70,6 +71,23 @@ export default function ServiceRequestDetailPage() {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...form, asset_details: assets }),
       });
+
+      // Auto-assign any newly picked assets to this request's staff/association
+      if (sr && (sr.staff_id || sr.association_id)) {
+        const originalIds = new Set((sr.asset_details || []).map(a => a.asset_id).filter(Boolean));
+        const newlyPicked = assets.filter(a => a.asset_id && !originalIds.has(a.asset_id));
+        for (const a of newlyPicked) {
+          await fetch(`/api/assets/${a.asset_id}/assign`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              staff_id: sr.staff_id || undefined,
+              association_id: sr.association_id || undefined,
+              notes: `Service Request ${sr.request_number}`,
+            }),
+          });
+        }
+      }
+
       setEditing(false); load();
     } finally { setSaving(false); }
   }
