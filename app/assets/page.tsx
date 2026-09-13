@@ -9,6 +9,8 @@ const ASSET_TYPES = [
   'Tablet', 'Server', 'Network Device', 'UPS', 'Keyboard', 'Mouse', 'Other',
 ];
 
+interface AssetCategory { id: number; name: string; color: string }
+
 const ASSET_TYPE_ICONS: Record<string, string> = {
   'Desktop Computer': '🖥️', 'Laptop': '💻', 'Monitor': '🖥️',
   'Printer': '🖨️', 'Phone / Mobile': '📱', 'Tablet': '📱',
@@ -31,7 +33,8 @@ interface Asset {
   make: string | null; model: string | null; serial_no: string | null;
   fru_part_no: string | null; condition: string;
   purchase_date: string | null; warranty_expiry: string | null;
-  notes: string | null; created_at: string;
+  notes: string | null; created_at: string; category_id: number | null;
+  category_name: string | null; category_color: string | null;
   assigned_to_name: string | null; assigned_to_type: string | null;
   current_assigned_date: string | null;
 }
@@ -39,7 +42,7 @@ interface Asset {
 const emptyForm = {
   asset_type: 'Desktop Computer', asset_tag: '', make: '', model: '',
   serial_no: '', fru_part_no: '', condition: 'good',
-  purchase_date: '', warranty_expiry: '', notes: '',
+  purchase_date: '', warranty_expiry: '', notes: '', category_id: '',
 };
 
 export default function AssetsPage() {
@@ -48,6 +51,8 @@ export default function AssetsPage() {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [condFilter, setCondFilter] = useState('');
+  const [catFilter, setCatFilter] = useState('');
+  const [categories, setCategories] = useState<AssetCategory[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -57,12 +62,17 @@ export default function AssetsPage() {
     if (search) params.set('search', search);
     if (typeFilter) params.set('type', typeFilter);
     if (condFilter) params.set('condition', condFilter);
+    if (catFilter) params.set('category', catFilter);
     const res = await fetch(`/api/assets?${params}`);
     setAssets(await res.json());
     setLoading(false);
   }
 
-  useEffect(() => { load(); }, [search, typeFilter, condFilter]); // eslint-disable-line
+  useEffect(() => {
+    fetch('/api/asset-categories').then(r => r.json()).then(setCategories);
+  }, []);
+
+  useEffect(() => { load(); }, [search, typeFilter, condFilter, catFilter]); // eslint-disable-line
 
   async function save() {
     setSaving(true);
@@ -136,6 +146,13 @@ export default function AssetsPage() {
             <option value="">All conditions</option>
             {CONDITIONS.map((c) => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
           </select>
+          {categories.length > 0 && (
+            <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)}
+              className="px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+              <option value="">All categories</option>
+              {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          )}
         </div>
 
         {/* Table */}
@@ -170,10 +187,17 @@ export default function AssetsPage() {
                             <div className="font-medium text-slate-900">
                               {[a.make, a.model].filter(Boolean).join(' ') || a.asset_type}
                             </div>
-                            <div className="text-xs text-slate-400">
+                            <div className="text-xs text-slate-400 flex items-center gap-1.5 flex-wrap">
                               {a.asset_tag && <span className="font-mono">{a.asset_tag}</span>}
-                              {a.asset_tag && <span> · </span>}
+                              {a.asset_tag && <span>·</span>}
                               <span>{a.asset_type}</span>
+                              {a.category_name && (
+                                <span className="inline-flex items-center gap-1">
+                                  <span>·</span>
+                                  <span className="w-2 h-2 rounded-full inline-block" style={{background: a.category_color || '#6366f1'}} />
+                                  <span>{a.category_name}</span>
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -224,11 +248,19 @@ export default function AssetsPage() {
               <h2 className="font-bold text-slate-900 text-lg mb-5">Add Asset</h2>
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2">
+                  <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1.5">Asset Type <span className="text-red-500">*</span></label>
                     <select value={form.asset_type} onChange={(e) => setForm((f) => ({ ...f, asset_type: e.target.value }))}
                       className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
                       {ASSET_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Category</label>
+                    <select value={form.category_id} onChange={(e) => setForm((f) => ({ ...f, category_id: e.target.value }))}
+                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+                      <option value="">No category</option>
+                      {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                   </div>
                   <div>

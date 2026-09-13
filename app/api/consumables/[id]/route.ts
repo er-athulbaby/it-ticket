@@ -1,0 +1,52 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@/lib/auth';
+import { query, queryOne } from '@/lib/db';
+
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const session = await auth();
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const { id } = await params;
+
+  const row = await queryOne(`SELECT * FROM consumables WHERE id = $1`, [id]);
+  if (!row) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  const transactions = await query(`
+    SELECT t.*, a.name AS admin_name, tk.ticket_number
+    FROM consumable_transactions t
+    LEFT JOIN admins a ON t.created_by = a.id
+    LEFT JOIN tickets tk ON t.ticket_id = tk.id
+    WHERE t.consumable_id = $1
+    ORDER BY t.created_at DESC
+  `, [id]);
+
+  return NextResponse.json({ ...row, transactions });
+}
+
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const session = await auth();
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if ((session.user as { role?: string }).role === 'viewer') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const { id } = await params;
+  const body = await req.json();
+
+  const set: string[] = []; const vals: unknown[] = []; let i = 1;
+  const s = (col: string, v: unknown) => { set.push(`${col}=$${i++}`); vals.push(v ?? null); };
+  if ('name' in body) s('name', body.name?.trim());
+  if ('category' in body) s('category', body.category?.trim() || null);
+  if ('unit' in body) s('unit', body.unit);
+  if ('low_stock_threshold' in body) s('low_stock_threshold', body.low_stock_threshold);
+  if ('notes' in body) s('notes', body.notes?.trim() || null);
+  if (!set.length) return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
+  set.push(`updated_at=NOW()`); vals.push(id);
+  const row = await queryOne(`UPDATE consumables SET ${set.join(',')} WHERE id=$${i} RETURNING *`, vals);
+  return NextResponse.json(row);
+}
+
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const session = await auth();
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if ((session.user as { role?: string }).role === 'viewer') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const { id } = await params;
+  await query('DELETE FROM consumables WHERE id=$1', [id]);
+  return NextResponse.json({ ok: true });
+}

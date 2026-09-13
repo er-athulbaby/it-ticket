@@ -74,6 +74,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if ('purchase_date' in body) set('purchase_date', body.purchase_date || null);
   if ('warranty_expiry' in body) set('warranty_expiry', body.warranty_expiry || null);
   if ('notes' in body) set('notes', body.notes?.trim() || null);
+  if ('category_id' in body) set('category_id', body.category_id ? Number(body.category_id) : null);
 
   if (!setClauses.length) return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
 

@@ -8,13 +8,22 @@ import { useSettings } from '@/lib/useSettings';
 import { getTheme } from '@/lib/themes';
 import { useState } from 'react';
 
-const ALL_NAV = [
+interface NavChild { href: string; label: string }
+interface NavItem { href: string; label: string; icon: string; viewerOk: boolean; children?: NavChild[] }
+
+const ALL_NAV: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: '◈', viewerOk: true },
   { href: '/tickets', label: 'Tickets', icon: '🎫', viewerOk: true },
   { href: '/categories', label: 'Categories', icon: '🏷️', viewerOk: false },
   { href: '/staff', label: 'Staff', icon: '👤', viewerOk: false },
   { href: '/associations', label: 'Associations', icon: '🏢', viewerOk: false },
-  { href: '/assets', label: 'Assets', icon: '🖥️', viewerOk: false },
+  { href: '/assets', label: 'Assets', icon: '🖥️', viewerOk: false, children: [
+    { href: '/assets', label: 'All Assets' },
+    { href: '/assets/categories', label: 'Categories' },
+  ]},
+  { href: '/consumables', label: 'Consumables', icon: '📦', viewerOk: false },
+  { href: '/licenses', label: 'Licenses', icon: '🔑', viewerOk: false },
+  { href: '/service-requests', label: 'Service Requests', icon: '📋', viewerOk: false },
   { href: '/users', label: 'Users', icon: '👥', viewerOk: false },
   { href: '/settings', label: 'Settings', icon: '⚙️', viewerOk: false },
 ];
@@ -32,6 +41,20 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
   const isViewer = (session?.user as { role?: string })?.role === 'viewer';
   const navItems = ALL_NAV.filter((item) => !isViewer || item.viewerOk);
 
+  function isActive(item: NavItem) {
+    if (item.children) return pathname === item.href || item.children.some(c => pathname === c.href || pathname.startsWith(c.href + '/'));
+    return pathname === item.href || pathname.startsWith(item.href + '/');
+  }
+
+  function isChildActive(href: string) {
+    return pathname === href || pathname.startsWith(href + '/');
+  }
+
+  // For items with children, show submenu when parent or any child is active
+  function showChildren(item: NavItem) {
+    return item.children && isActive(item);
+  }
+
   return (
     <div className={cn('flex flex-col h-full text-white w-64', theme.sidebar)}>
       {/* Logo */}
@@ -48,17 +71,39 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
         {navItems.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(item.href + '/');
+          const active = isActive(item);
+          const hasChildren = item.children && item.children.length > 0;
+
           return (
-            <Link key={item.href} href={item.href} onClick={onClose}
-              className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-                active ? theme.active + ' text-white' : 'text-white/70 ' + theme.hover + ' hover:text-white'
-              )}>
-              <span className="text-base">{item.icon}</span>
-              {item.label}
-            </Link>
+            <div key={item.href}>
+              <Link href={hasChildren ? item.children![0].href : item.href} onClick={onClose}
+                className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                  active ? theme.active + ' text-white' : 'text-white/70 ' + theme.hover + ' hover:text-white'
+                )}>
+                <span className="text-base">{item.icon}</span>
+                <span className="flex-1">{item.label}</span>
+                {hasChildren && <span className="text-xs text-white/50">{active ? '▾' : '▸'}</span>}
+              </Link>
+
+              {/* Submenu */}
+              {hasChildren && showChildren(item) && (
+                <div className="ml-4 mt-0.5 space-y-0.5 border-l border-white/10 pl-3">
+                  {item.children!.map((child) => {
+                    const childActive = isChildActive(child.href);
+                    return (
+                      <Link key={child.href} href={child.href} onClick={onClose}
+                        className={cn('block px-3 py-2 rounded-lg text-xs font-medium transition-colors',
+                          childActive ? 'bg-white/20 text-white' : 'text-white/60 hover:text-white hover:bg-white/10'
+                        )}>
+                        {child.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           );
         })}
       </nav>
