@@ -14,6 +14,9 @@ interface SR {
   employee_name: string | null; cpr_no: string | null; department: string | null;
   mobile_no: string | null;
   asset_details: AssetRow[] | null;
+  accessories: string[] | null;
+  duration_type: string;
+  return_by_date: string | null;
   comments: string | null;
   employee_signed_date: string | null;
   completed_by_name: string | null; completed_by_date: string | null;
@@ -38,6 +41,7 @@ const STATUS_STYLES: Record<string, string> = {
 const STATUS_LABELS: Record<string, string> = { pending: 'Pending', in_progress: 'In Progress', completed: 'Completed', cancelled: 'Cancelled' };
 
 const emptyAsset: AssetRow = { asset_id: null, item: '', make: '', model: '', serial: '', tag: '' };
+const ACCESSORY_OPTIONS = ['Cable', 'Mouse', 'Keyboard'];
 
 export default function ServiceRequestDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -102,6 +106,14 @@ export default function ServiceRequestDetailPage() {
   function printForm() { window.print(); }
 
   function ff(k: keyof SR, v: string) { setForm(prev => ({ ...prev, [k]: v || null })); }
+
+  function toggleAccessory(name: string) {
+    setForm(prev => {
+      const current = prev.accessories || [];
+      const next = current.includes(name) ? current.filter(x => x !== name) : [...current, name];
+      return { ...prev, accessories: next };
+    });
+  }
 
   function selectAsset(idx: number, assetId: string) {
     const a = assetOptions.find(x => x.id === Number(assetId));
@@ -218,6 +230,40 @@ export default function ServiceRequestDetailPage() {
             </div>
 
             <div>
+              <h3 className="font-semibold text-slate-800 mb-3">Accessories</h3>
+              <div className="flex gap-4 flex-wrap">
+                {ACCESSORY_OPTIONS.map((name) => (
+                  <label key={name} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                    <input type="checkbox" checked={(form.accessories || []).includes(name)} onChange={() => toggleAccessory(name)}
+                      className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                    {name}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <h3 className="font-semibold text-slate-800 mb-3">Duration</h3>
+              <div className="flex items-center gap-4 flex-wrap">
+                <div className="flex gap-2">
+                  {(['permanent','temporary'] as const).map((t) => (
+                    <button key={t} type="button" onClick={() => ff('duration_type', t)}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${(form.duration_type || 'permanent') === t ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-300 text-slate-600'}`}>
+                      {t === 'permanent' ? 'Permanent' : 'Temporary'}
+                    </button>
+                  ))}
+                </div>
+                {form.duration_type === 'temporary' && (
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Return By</label>
+                    <input type="date" value={(form.return_by_date as string)?.slice(0,10) || ''} onChange={(e) => ff('return_by_date', e.target.value)}
+                      className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div>
               <h3 className="font-semibold text-slate-800 mb-3">Signatures / Completion</h3>
               <div className="grid grid-cols-2 gap-4">
                 {([['employee_signed_date','Employee Signed Date','date'],['completed_by_name','Completed By','text'],['completed_by_date','Completed Date','date'],['device_return_name','Device Returned By','text'],['device_return_date','Device Return Date','date'],['received_by_name','Received By','text'],['received_by_date','Received Date','date'],['device_condition','Device Condition','text']] as [keyof SR, string, string][]).map(([k,l,type]) => (
@@ -259,6 +305,15 @@ export default function ServiceRequestDetailPage() {
                     </tbody>
                   </table>
                 </div>
+              </div>
+            )}
+            {((sr.accessories && sr.accessories.length > 0) || sr.duration_type) && (
+              <div className="bg-white border border-slate-200 rounded-xl p-6">
+                <h3 className="font-semibold text-slate-800 mb-4">Accessories &amp; Duration</h3>
+                <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                  <div><dt className="text-xs text-slate-500 font-medium">Accessories</dt><dd className="text-slate-900 mt-0.5">{sr.accessories?.length ? sr.accessories.join(', ') : '—'}</dd></div>
+                  <div><dt className="text-xs text-slate-500 font-medium">Duration</dt><dd className="text-slate-900 mt-0.5 capitalize">{sr.duration_type || 'permanent'}{sr.duration_type === 'temporary' && sr.return_by_date ? ` · Return by ${new Date(sr.return_by_date).toLocaleDateString()}` : ''}</dd></div>
+                </dl>
               </div>
             )}
             {(sr.completed_by_name || sr.employee_signed_date || sr.comments) && (
@@ -325,6 +380,14 @@ export default function ServiceRequestDetailPage() {
                 <td style={{fontFamily:'monospace'}}>{a.tag}</td>
               </tr>
             ))}
+          </tbody>
+        </table>
+
+        <div className="pf-section">Accessories &amp; Duration</div>
+        <table className="pf-table">
+          <tbody>
+            <tr><td className="pf-label">Accessories</td><td>{sr.accessories?.length ? sr.accessories.join(', ') : '—'}</td>
+              <td className="pf-label">Duration</td><td style={{textTransform:'capitalize'}}>{sr.duration_type || 'permanent'}{sr.duration_type === 'temporary' && sr.return_by_date ? ` (return by ${new Date(sr.return_by_date).toLocaleDateString()})` : ''}</td></tr>
           </tbody>
         </table>
 

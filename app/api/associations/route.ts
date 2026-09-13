@@ -14,12 +14,12 @@ export async function POST(req: NextRequest) {
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
   if (!token || token.userType !== 'admin') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { name } = await req.json();
+  const { name, email } = await req.json();
   if (!name?.trim()) return NextResponse.json({ error: 'Name is required' }, { status: 400 });
 
   const association = await queryOne(
-    'INSERT INTO associations (name) VALUES ($1) RETURNING *',
-    [name.trim()]
+    'INSERT INTO associations (name, email) VALUES ($1, $2) RETURNING *',
+    [name.trim(), email?.trim() || null]
   );
   return NextResponse.json(association, { status: 201 });
 }

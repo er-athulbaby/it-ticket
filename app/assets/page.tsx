@@ -6,6 +6,9 @@ import Link from 'next/link';
 
 interface AssetCategory { id: number; name: string; color: string }
 
+const MAKES = ['Dell', 'HP', 'Lenovo', 'Apple', 'Asus', 'Acer', 'Samsung', 'LG', 'Cisco', 'TP-Link', 'Canon', 'Epson', 'Other'];
+const OTHER = '__other__';
+
 const CONDITIONS = ['new', 'good', 'fair', 'poor', 'retired'];
 
 const CONDITION_STYLES: Record<string, string> = {
@@ -43,6 +46,8 @@ export default function AssetsPage() {
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(emptyForm);
+  const [makeCustom, setMakeCustom] = useState(false);
+  const [modelCustom, setModelCustom] = useState(false);
 
   async function load() {
     const params = new URLSearchParams();
@@ -70,6 +75,7 @@ export default function AssetsPage() {
       });
       setShowForm(false);
       setForm(emptyForm);
+      setMakeCustom(false); setModelCustom(false);
       load();
     } finally {
       setSaving(false);
@@ -99,7 +105,7 @@ export default function AssetsPage() {
             <h1 className="text-2xl font-bold text-slate-900">Assets</h1>
             <p className="text-sm text-slate-500 mt-0.5">{assets.length} device{assets.length !== 1 ? 's' : ''} registered</p>
           </div>
-          <button onClick={() => { setShowForm(true); setForm(emptyForm); }}
+          <button onClick={() => { setShowForm(true); setForm(emptyForm); setMakeCustom(false); setModelCustom(false); }}
             className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
             + Add Asset
           </button>
@@ -253,15 +259,42 @@ export default function AssetsPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1.5">Make</label>
-                    <input type="text" placeholder="e.g. Dell, HP, Apple" value={form.make}
-                      onChange={(e) => setForm((f) => ({ ...f, make: e.target.value }))}
-                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                    {makeCustom ? (
+                      <input type="text" autoFocus placeholder="Type make" value={form.make}
+                        onChange={(e) => setForm((f) => ({ ...f, make: e.target.value }))}
+                        onBlur={() => { if (!form.make) setMakeCustom(false); }}
+                        className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                    ) : (
+                      <select value={MAKES.includes(form.make) ? form.make : ''} onChange={(e) => {
+                        if (e.target.value === OTHER) { setMakeCustom(true); setForm((f) => ({ ...f, make: '' })); }
+                        else setForm((f) => ({ ...f, make: e.target.value }));
+                      }}
+                        className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+                        <option value="">Select make…</option>
+                        {MAKES.map((m) => <option key={m} value={m === 'Other' ? OTHER : m}>{m}</option>)}
+                      </select>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1.5">Model</label>
-                    <input type="text" placeholder="e.g. Latitude 5540" value={form.model}
-                      onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))}
-                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                    {modelCustom ? (
+                      <input type="text" autoFocus placeholder="Type model" value={form.model}
+                        onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))}
+                        onBlur={() => { if (!form.model) setModelCustom(false); }}
+                        className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                    ) : (
+                      <select value={form.model} onChange={(e) => {
+                        if (e.target.value === OTHER) { setModelCustom(true); setForm((f) => ({ ...f, model: '' })); }
+                        else setForm((f) => ({ ...f, model: e.target.value }));
+                      }}
+                        className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+                        <option value="">Select model…</option>
+                        {Array.from(new Set(assets.map((a) => a.model).filter(Boolean))).sort().map((m) => (
+                          <option key={m} value={m as string}>{m}</option>
+                        ))}
+                        <option value={OTHER}>Other (type new)…</option>
+                      </select>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1.5">Serial No.</label>

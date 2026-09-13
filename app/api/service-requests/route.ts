@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { query, queryOne } from '@/lib/db';
+import { sendServiceRequestCreatedEmail } from '@/lib/email';
 
 export async function GET() {
   const session = await auth();
@@ -34,25 +35,21 @@ export async function POST(req: NextRequest) {
   await query(`UPDATE app_settings SET value=$1 WHERE key='sr_counter'`, [String(next)]);
   const requestNumber = `SR-${String(next).padStart(5, '0')}`;
 
-  const row = await queryOne(`
+  const row = await queryOne<{ id: number; request_number: string; employee_name: string | null; duration_type: string; return_by_date: string | null }>(`
     INSERT INTO service_requests (
-      request_number, staff_id, association_id, cpr_no, department, mobile_no, tel_no, fax_no,
-      address, company, it_username, it_domain_id, it_security_group, it_membership,
-      it_access_permissions, it_map_drives, it_duration, asset_details, status, comments,
+      request_number, staff_id, association_id, cpr_no, department, mobile_no,
+      asset_details, accessories, duration_type, return_by_date, status, comments,
       employee_name, employee_signed_date, completed_by_name, completed_by_date,
       device_return_name, device_return_date, received_by_name, received_by_date,
       device_condition, created_by
     ) VALUES (
-      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
-      $21,$22,$23,$24,$25,$26,$27,$28,$29,$30
+      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22
     ) RETURNING *
   `, [
     requestNumber, body.staff_id || null, body.association_id || null,
     body.cpr_no || null, body.department || null, body.mobile_no || null,
-    body.tel_no || null, body.fax_no || null, body.address || null, body.company || null,
-    body.it_username || null, body.it_domain_id || null, body.it_security_group || null,
-    body.it_membership || null, body.it_access_permissions || null, body.it_map_drives || null,
-    body.it_duration || null, JSON.stringify(body.asset_details || []),
+    JSON.stringify(body.asset_details || []), JSON.stringify(body.accessories || []),
+    body.duration_type || 'permanent', body.return_by_date || null,
     body.status || 'pending', body.comments || null,
     body.employee_name || null, body.employee_signed_date || null,
     body.completed_by_name || null, body.completed_by_date || null,
@@ -60,6 +57,25 @@ export async function POST(req: NextRequest) {
     body.received_by_name || null, body.received_by_date || null,
     body.device_condition || null, adminId,
   ]);
+
+  if (row) {
+    const recipient = await queryOne<{ email: string | null }>(`
+      SELECT COALESCE(s.email, assoc.email) AS email
+      FROM service_requests sr
+      LEFT JOIN staff s ON sr.staff_id = s.id
+      LEFT JOIN associations assoc ON sr.association_id = assoc.id
+      WHERE sr.id = $1
+    `, [row.id]);
+    if (recipient?.email) {
+      await query(`UPDATE service_requests SET request_email_sent = TRUE WHERE id = $1`, [row.id]);
+      await sendServiceRequestCreatedEmail(recipient.email, {
+        request_number: row.request_number,
+        employee_name: row.employee_name,
+        duration_type: row.duration_type,
+        return_by_date: row.return_by_date,
+      }).catch(() => {});
+    }
+  }
 
   return NextResponse.json(row, { status: 201 });
 }
