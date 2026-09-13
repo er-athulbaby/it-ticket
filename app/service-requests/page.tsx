@@ -151,7 +151,7 @@ export default function ServiceRequestsPage() {
               ) : (
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">Association</label>
-                  <select value={form.association_id} onChange={(e) => { f('association_id', e.target.value); const a = associations.find(x => x.id === Number(e.target.value)); if (a) f('employee_name', a.name); }}
+                  <select value={form.association_id} onChange={(e) => f('association_id', e.target.value)}
                     className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
                     <option value="">Select association…</option>
                     {associations.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
@@ -161,13 +161,13 @@ export default function ServiceRequestsPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 {[
-                  {k:'employee_name',l:'Employee Name',ph:''},
+                  {k:'employee_name',l: recipientType === 'association' ? 'Employee Name (contact person)' : 'Employee Name', ph: recipientType === 'association' ? 'Name of the person at this association' : ''},
                   {k:'cpr_no',l:'CPR No.',ph:''},
                   {k:'department',l:'Department',ph:''},
                   {k:'mobile_no',l:'Mobile',ph:''},
                 ].map(({k,l,ph}) => (
-                  <div key={k}>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">{l}</label>
+                  <div key={k} className={k === 'employee_name' ? 'col-span-2' : ''}>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">{l}{k === 'employee_name' && <span className="text-red-500"> *</span>}</label>
                     <input type="text" value={(form as Record<string,string>)[k]} onChange={(e) => f(k, e.target.value)} placeholder={ph}
                       className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
                   </div>
@@ -175,7 +175,7 @@ export default function ServiceRequestsPage() {
               </div>
 
               <div className="flex gap-3 mt-6">
-                <button onClick={save} disabled={saving}
+                <button onClick={save} disabled={saving || !form.employee_name.trim()}
                   className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-medium px-5 py-2.5 rounded-lg text-sm">{saving ? 'Creating…' : 'Create & Open'}</button>
                 <button onClick={() => setShowForm(false)} className="border border-slate-300 text-slate-700 font-medium px-5 py-2.5 rounded-lg text-sm hover:bg-slate-50">Cancel</button>
               </div>
