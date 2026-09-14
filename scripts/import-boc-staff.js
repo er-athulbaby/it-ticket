@@ -169,18 +169,21 @@ async function main() {
   console.log(`\n=== BOC Staff Import ${APPLY ? '(APPLY MODE)' : '(DRY RUN)'} ===`);
   console.log(`CSV rows: ${dataRows.length} | Existing staff: ${existingStaff.length} | Existing associations: ${existingAssoc.length}\n`);
 
+  const FULL = process.argv.includes('--full');
+  const LIMIT = FULL ? Infinity : 20;
+
   console.log(`--- MATCHED (will UPDATE, ${matched.length}) ---`);
-  for (const m of matched.slice(0, 20)) {
+  for (const m of matched.slice(0, LIMIT)) {
     console.log(`  [${(m.score * 100).toFixed(0)}%] DB#${m.existing.id} "${m.existing.name}" <- CSV "${m.csvRow[idx.name]}"`);
   }
-  if (matched.length > 20) console.log(`  ... and ${matched.length - 20} more`);
+  if (!FULL && matched.length > 20) console.log(`  ... and ${matched.length - 20} more (use --full to see all)`);
 
   const flaggedForReview = newInserts.filter((n) => n.reviewCandidate);
   console.log(`\n--- REVIEW SUGGESTED (treated as NEW, but similar to an existing record, ${flaggedForReview.length}) ---`);
-  for (const n of flaggedForReview.slice(0, 20)) {
+  for (const n of flaggedForReview.slice(0, LIMIT)) {
     console.log(`  [${(n.reviewScore * 100).toFixed(0)}%] CSV "${n.csvRow[idx.name]}" ~ DB#${n.reviewCandidate.id} "${n.reviewCandidate.name}"`);
   }
-  if (flaggedForReview.length > 20) console.log(`  ... and ${flaggedForReview.length - 20} more`);
+  if (!FULL && flaggedForReview.length > 20) console.log(`  ... and ${flaggedForReview.length - 20} more (use --full to see all)`);
 
   console.log(`\n--- NEW INSERTS (${newInserts.length}) ---`);
   console.log(`  (${newInserts.length - flaggedForReview.length} clean new + ${flaggedForReview.length} flagged above)`);
