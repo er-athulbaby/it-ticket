@@ -11,10 +11,11 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   if (!row) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const transactions = await query(`
-    SELECT t.*, a.name AS admin_name, tk.ticket_number
+    SELECT t.*, a.name AS admin_name, tk.ticket_number, s.name AS staff_name
     FROM consumable_transactions t
     LEFT JOIN admins a ON t.created_by = a.id
     LEFT JOIN tickets tk ON t.ticket_id = tk.id
+    LEFT JOIN staff s ON t.staff_id = s.id
     WHERE t.consumable_id = $1
     ORDER BY t.created_at DESC
   `, [id]);

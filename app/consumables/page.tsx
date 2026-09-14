@@ -9,6 +9,8 @@ interface Consumable {
   total_in: number; total_out: number;
 }
 
+interface StaffOption { id: number; name: string; department: string | null }
+
 const emptyForm = { name: '', category: '', unit: 'piece', quantity: 0, low_stock_threshold: 5, notes: '' };
 
 export default function ConsumablesPage() {
@@ -19,9 +21,10 @@ export default function ConsumablesPage() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [txModal, setTxModal] = useState<Consumable | null>(null);
-  const [txForm, setTxForm] = useState({ type: 'in', quantity: 1, notes: '', ticket_id: '' });
+  const [txForm, setTxForm] = useState({ type: 'in', quantity: 1, notes: '', ticket_id: '', recipientType: 'none', staff_id: '', department: '' });
   const [txSaving, setTxSaving] = useState(false);
   const [txError, setTxError] = useState('');
+  const [staffOptions, setStaffOptions] = useState<StaffOption[]>([]);
 
   async function load() {
     const res = await fetch('/api/consumables');
@@ -29,7 +32,12 @@ export default function ConsumablesPage() {
     setLoading(false);
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    fetch('/api/staff').then((r) => r.json()).then(setStaffOptions);
+  }, []);
+
+  const departments = [...new Set(staffOptions.map((s) => s.department).filter(Boolean))].sort() as string[];
 
   function openNew() { setEditing(null); setForm(emptyForm); setShowForm(true); }
   function openEdit(c: Consumable) {
@@ -62,10 +70,15 @@ export default function ConsumablesPage() {
     try {
       const res = await fetch(`/api/consumables/${txModal.id}/transactions`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transaction_type: txForm.type, quantity: Number(txForm.quantity), notes: txForm.notes, ticket_id: txForm.ticket_id ? Number(txForm.ticket_id) : null }),
+        body: JSON.stringify({
+          transaction_type: txForm.type, quantity: Number(txForm.quantity), notes: txForm.notes,
+          ticket_id: txForm.ticket_id ? Number(txForm.ticket_id) : null,
+          staff_id: txForm.recipientType === 'staff' && txForm.staff_id ? Number(txForm.staff_id) : null,
+          department: txForm.recipientType === 'department' ? txForm.department : null,
+        }),
       });
       if (!res.ok) { const d = await res.json(); setTxError(d.error || 'Failed'); return; }
-      setTxModal(null); setTxForm({ type: 'in', quantity: 1, notes: '', ticket_id: '' }); load();
+      setTxModal(null); setTxForm({ type: 'in', quantity: 1, notes: '', ticket_id: '', recipientType: 'none', staff_id: '', department: '' }); load();
     } finally { setTxSaving(false); }
   }
 
@@ -116,7 +129,7 @@ export default function ConsumablesPage() {
                         </td>
                         <td className="px-4 py-3.5">
                           <div className="flex gap-2 justify-end">
-                            <button onClick={() => { setTxModal(c); setTxForm({ type: 'in', quantity: 1, notes: '', ticket_id: '' }); }}
+                            <button onClick={() => { setTxModal(c); setTxForm({ type: 'in', quantity: 1, notes: '', ticket_id: '', recipientType: 'none', staff_id: '', department: '' }); }}
                               className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1.5 rounded-lg font-medium">Stock</button>
                             <button onClick={() => openEdit(c)} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">Edit</button>
                             <button onClick={() => remove(c.id)} className="text-sm text-red-500 hover:text-red-700 font-medium">Delete</button>
@@ -199,6 +212,30 @@ export default function ConsumablesPage() {
                   <input type="number" min="1" value={txForm.quantity} onChange={(e) => setTxForm(f => ({ ...f, quantity: Number(e.target.value) }))}
                     className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
                 </div>
+                {txForm.type === 'out' && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Issued To</label>
+                    <div className="flex gap-2 mb-2">
+                      {[{v:'none',l:'General'},{v:'staff',l:'Staff'},{v:'department',l:'Department'}].map(({v,l}) => (
+                        <button key={v} type="button" onClick={() => setTxForm(f => ({ ...f, recipientType: v }))}
+                          className={`flex-1 py-1.5 rounded-lg text-xs font-medium border transition-colors ${txForm.recipientType === v ? 'bg-indigo-600 text-white border-indigo-600' : 'border-slate-300 text-slate-600'}`}>{l}</button>
+                      ))}
+                    </div>
+                    {txForm.recipientType === 'staff' && (
+                      <select value={txForm.staff_id} onChange={(e) => setTxForm(f => ({ ...f, staff_id: e.target.value }))}
+                        className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+                        <option value="">Select staff…</option>
+                        {staffOptions.map((s) => <option key={s.id} value={s.id}>{s.name}{s.department ? ` · ${s.department}` : ''}</option>)}
+                      </select>
+                    )}
+                    {txForm.recipientType === 'department' && (
+                      <input type="text" value={txForm.department} onChange={(e) => setTxForm(f => ({ ...f, department: e.target.value }))}
+                        placeholder="e.g. Information Technology" list="consumable-dept-list"
+                        className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                    )}
+                    <datalist id="consumable-dept-list">{departments.map((d) => <option key={d} value={d} />)}</datalist>
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">Notes <span className="text-slate-400 font-normal">(optional)</span></label>
                   <input type="text" value={txForm.notes} onChange={(e) => setTxForm(f => ({ ...f, notes: e.target.value }))} placeholder="e.g. Used for printer repair"

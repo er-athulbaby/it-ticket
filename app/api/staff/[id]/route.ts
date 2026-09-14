@@ -52,5 +52,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     LIMIT 50
   `, [id]);
 
-  return NextResponse.json({ ...staff, assets, licenses, tickets, serviceRequests });
+  const consumables = await query(`
+    SELECT ct.id, ct.transaction_type, ct.quantity, ct.notes, ct.created_at,
+           c.id AS consumable_id, c.name AS consumable_name, c.unit
+    FROM consumable_transactions ct
+    JOIN consumables c ON ct.consumable_id = c.id
+    WHERE ct.staff_id = $1
+    ORDER BY ct.created_at DESC
+    LIMIT 50
+  `, [id]);
+
+  return NextResponse.json({ ...staff, assets, licenses, tickets, serviceRequests, consumables });
 }
