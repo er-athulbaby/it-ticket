@@ -5,8 +5,12 @@ import AppLayout from '@/components/layout/AppLayout';
 
 interface Staff {
   id: number; name: string; department: string | null; email: string | null;
+  mobile: string | null; staff_code: string | null; ms_license: string | null;
+  association_id: number | null; association_name: string | null;
   is_active: boolean; created_at: string; photo_filename: string | null;
 }
+
+interface AssociationOption { id: number; name: string }
 
 export default function StaffPage() {
   const [staff, setStaff] = useState<Staff[]>([]);
@@ -17,7 +21,8 @@ export default function StaffPage() {
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ name: string; status: string }[] | null>(null);
   const [search, setSearch] = useState('');
-  const [form, setForm] = useState({ name: '', department: '', email: '', password: '' });
+  const [associations, setAssociations] = useState<AssociationOption[]>([]);
+  const [form, setForm] = useState({ name: '', department: '', email: '', password: '', mobile: '', association_id: '', ms_license: '' });
   const [photoUploading, setPhotoUploading] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const photoRef = useRef<HTMLInputElement>(null);
@@ -29,17 +34,23 @@ export default function StaffPage() {
     setLoading(false);
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    fetch('/api/associations').then((r) => r.json()).then(setAssociations);
+  }, []);
 
   function openNew() {
     setEditing(null);
-    setForm({ name: '', department: '', email: '', password: '' });
+    setForm({ name: '', department: '', email: '', password: '', mobile: '', association_id: '', ms_license: '' });
     setShowForm(true);
   }
 
   function openEdit(s: Staff) {
     setEditing(s);
-    setForm({ name: s.name, department: s.department || '', email: s.email || '', password: '' });
+    setForm({
+      name: s.name, department: s.department || '', email: s.email || '', password: '',
+      mobile: s.mobile || '', association_id: s.association_id ? String(s.association_id) : '', ms_license: s.ms_license || '',
+    });
     setShowForm(true);
   }
 
@@ -50,6 +61,9 @@ export default function StaffPage() {
       department: form.department,
       email: form.email.trim() || null,
       password: form.password || undefined,
+      mobile: form.mobile.trim() || null,
+      association_id: form.association_id ? Number(form.association_id) : null,
+      ms_license: form.ms_license.trim() || null,
     };
     if (editing) {
       payload.id = editing.id;
@@ -176,6 +190,25 @@ export default function StaffPage() {
                     placeholder="e.g. IT, HR, Finance" list="dept-list" />
                   <datalist id="dept-list">{departments.map((d) => <option key={d} value={d!} />)}</datalist>
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Association / Federation</label>
+                  <select value={form.association_id} onChange={(e) => setForm((f) => ({ ...f, association_id: e.target.value }))}
+                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+                    <option value="">None (internal BOC staff)</option>
+                    {associations.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Mobile</label>
+                  <input type="text" value={form.mobile} onChange={(e) => setForm((f) => ({ ...f, mobile: e.target.value }))}
+                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="e.g. 33137593" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Microsoft License</label>
+                  <input type="text" value={form.ms_license} onChange={(e) => setForm((f) => ({ ...f, ms_license: e.target.value }))}
+                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="e.g. Microsoft 365 Business Premium" />
+                  {editing?.staff_code && <p className="text-xs text-slate-400 mt-1">Staff ID: <span className="font-mono">{editing.staff_code}</span></p>}
+                </div>
 
                 <div className="border-t border-slate-100 pt-4 space-y-3">
                   <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">Portal Login (optional)</p>
@@ -244,16 +277,18 @@ export default function StaffPage() {
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium text-slate-900">{s.name}</span>
+                      {s.staff_code && <span className="text-xs font-mono text-slate-400">{s.staff_code}</span>}
                       {s.email && (
                         <span className="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-medium">Portal</span>
                       )}
+                      {s.association_name && (
+                        <span className="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full font-medium">{s.association_name}</span>
+                      )}
                     </div>
                     <div className="text-sm text-slate-500">
-                      {s.department && <span>{s.department}</span>}
-                      {s.department && s.email && <span> · </span>}
-                      {s.email && <span>{s.email}</span>}
+                      {[s.department, s.email, s.mobile].filter(Boolean).join(' · ') || '—'}
                     </div>
                   </div>
                   <div className="flex gap-3 flex-shrink-0">

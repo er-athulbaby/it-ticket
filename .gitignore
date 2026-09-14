@@ -36,6 +36,9 @@ yarn-error.log*
 # Uploaded attachments (stored on server disk)
 /uploads/
 
+# Staff directory export (contains internal PII — never commit)
+/scripts/data/
+
 # vercel
 .vercel
 
