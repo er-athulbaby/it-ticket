@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { query, queryOne } from '@/lib/db';
 import { sendNewTicketEmail } from '@/lib/email';
+import { logAudit } from '@/lib/audit';
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -97,6 +98,11 @@ export async function POST(req: NextRequest) {
     INSERT INTO ticket_history (ticket_id, admin_id, action, new_value)
     VALUES ($1, $2, 'created', $3)
   `, [ticket!.id as number, adminId, 'Ticket created']);
+
+  logAudit({
+    entityType: 'ticket', entityId: ticket!.id as number, entityLabel: ticket!.ticket_number as string,
+    action: 'create', adminId, adminName: (session.user as { name?: string })?.name || null,
+  });
 
   // Send email notification (non-blocking)
   let requesterName: string | null = null;

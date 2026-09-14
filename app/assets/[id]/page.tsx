@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
+import { useEffect, useState, useRef, use } from 'react';
 import { useRouter } from 'next/navigation';
 import AppLayout from '@/components/layout/AppLayout';
 import Link from 'next/link';
@@ -20,8 +20,8 @@ const CONDITION_STYLES: Record<string, string> = {
 interface Asset {
   id: number; asset_tag: string | null; category_id: number | null;
   category_name: string | null; category_color: string | null;
-  make: string | null; model: string | null; serial_no: string | null;
-  fru_part_no: string | null; condition: string;
+  make: string | null; vendor: string | null; model: string | null; serial_no: string | null;
+  fru_part_no: string | null; condition: string; unit_price: number | null; photo_filename: string | null;
   purchase_date: string | null; warranty_expiry: string | null;
   notes: string | null; created_at: string;
   assigned_to_name: string | null; assigned_to_type: string | null;
@@ -29,6 +29,7 @@ interface Asset {
   current_staff_id: number | null; current_association_id: number | null;
   current_assigned_date: string | null; current_assignment_notes: string | null;
   history: AssignmentRow[];
+  auditHistory: AuditEntry[];
 }
 
 interface AssignmentRow {
@@ -37,6 +38,8 @@ interface AssignmentRow {
   assigned_date: string; returned_date: string | null;
   assigned_by_name: string | null; notes: string | null;
 }
+
+interface AuditEntry { id: number; action: string; changes: Record<string, { old: unknown; new: unknown }> | null; admin_name: string | null; created_at: string }
 
 interface StaffRow { id: number; name: string; department: string | null }
 interface AssocRow { id: number; name: string }
@@ -56,6 +59,8 @@ export default function AssetDetailPage({ params }: { params: Promise<{ id: stri
   const [assignForm, setAssignForm] = useState({ type: 'staff', staff_id: '', association_id: '', assigned_date: new Date().toISOString().slice(0, 10), notes: '' });
   const [assigning, setAssigning] = useState(false);
   const [returning, setReturning] = useState(false);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const photoRef = useRef<HTMLInputElement>(null);
 
   async function load() {
     const res = await fetch(`/api/assets/${id}`);
@@ -117,6 +122,22 @@ export default function AssetDetailPage({ params }: { params: Promise<{ id: stri
     }
   }
 
+  async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhotoUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('photo', file);
+      fd.append('assetId', String(id));
+      await fetch('/api/assets/photo', { method: 'POST', body: fd });
+      load();
+    } finally {
+      setPhotoUploading(false);
+      if (photoRef.current) photoRef.current.value = '';
+    }
+  }
+
   if (loading) return <AppLayout><div className="flex items-center justify-center h-64 text-slate-400">Loading…</div></AppLayout>;
   if (!asset) return null;
 
@@ -139,8 +160,19 @@ export default function AssetDetailPage({ params }: { params: Promise<{ id: stri
         <div className="bg-white border border-slate-200 rounded-xl p-6">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: (asset.category_color || '#6366f1') + '1a' }}>
-                <span className="w-4 h-4 rounded-full" style={{ background: asset.category_color || '#6366f1' }} />
+              <div className="relative flex-shrink-0 group cursor-pointer" onClick={() => photoRef.current?.click()}>
+                {asset.photo_filename ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={`/api/assets/photo?assetId=${asset.id}`} alt="Asset" className="w-14 h-14 rounded-xl object-cover border border-slate-200" />
+                ) : (
+                  <div className="w-14 h-14 rounded-xl flex items-center justify-center" style={{ background: (asset.category_color || '#6366f1') + '1a' }}>
+                    <span className="w-4 h-4 rounded-full" style={{ background: asset.category_color || '#6366f1' }} />
+                  </div>
+                )}
+                <div className="absolute inset-0 rounded-xl bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                  {photoUploading ? <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <span className="text-white text-xs">📷</span>}
+                </div>
+                <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
               </div>
               <div>
                 <h1 className="text-xl font-bold text-slate-900">
@@ -195,6 +227,8 @@ export default function AssetDetailPage({ params }: { params: Promise<{ id: stri
             {[
               { label: 'Serial No.', value: asset.serial_no, mono: true },
               { label: 'FRU / Part No.', value: asset.fru_part_no, mono: true },
+              { label: 'Vendor', value: asset.vendor },
+              { label: 'Unit Price', value: asset.unit_price != null ? `BHD ${Number(asset.unit_price).toFixed(2)}` : null },
               { label: 'Purchase Date', value: asset.purchase_date ? new Date(asset.purchase_date).toLocaleDateString() : null },
               { label: 'Warranty Expiry', value: asset.warranty_expiry ? new Date(asset.warranty_expiry).toLocaleDateString() : null, warn: !!warrantyExpired },
               { label: 'Added', value: new Date(asset.created_at).toLocaleDateString() },
@@ -243,6 +277,30 @@ export default function AssetDetailPage({ params }: { params: Promise<{ id: stri
           )}
         </div>
 
+        {/* Change history */}
+        {asset.auditHistory && asset.auditHistory.length > 0 && (
+          <div className="bg-white border border-slate-200 rounded-xl p-6">
+            <h2 className="font-semibold text-slate-900 mb-4">Change History</h2>
+            <div className="divide-y divide-slate-100">
+              {asset.auditHistory.map((h) => (
+                <div key={h.id} className="py-2.5 text-sm">
+                  <div className="text-slate-700">
+                    <span className="font-medium capitalize">{h.action}</span> by {h.admin_name || 'system'}
+                    <span className="text-xs text-slate-400 ml-2">{new Date(h.created_at).toLocaleString()}</span>
+                  </div>
+                  {h.changes && (
+                    <div className="text-xs text-slate-500 mt-1 space-y-0.5">
+                      {Object.entries(h.changes).map(([field, { old: oldV, new: newV }]) => (
+                        <div key={field}>{field}: <span className="line-through text-slate-400">{String(oldV ?? '—')}</span> → <span className="text-slate-700">{String(newV ?? '—')}</span></div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
       </div>
 
       {/* Edit Modal */}
@@ -262,6 +320,7 @@ export default function AssetDetailPage({ params }: { params: Promise<{ id: stri
                 {[
                   { key: 'asset_tag', label: 'Asset Tag' },
                   { key: 'make', label: 'Make' },
+                  { key: 'vendor', label: 'Vendor / Supplier' },
                   { key: 'model', label: 'Model' },
                   { key: 'serial_no', label: 'Serial No.' },
                   { key: 'fru_part_no', label: 'FRU / Part No.' },
@@ -273,6 +332,12 @@ export default function AssetDetailPage({ params }: { params: Promise<{ id: stri
                       className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
                   </div>
                 ))}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Unit Price</label>
+                  <input type="number" step="0.01" min="0" value={editForm.unit_price ?? ''}
+                    onChange={(e) => setEditForm((f) => ({ ...f, unit_price: e.target.value === '' ? null : Number(e.target.value) }))}
+                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">Condition</label>
                   <select value={editForm.condition || 'good'} onChange={(e) => setEditForm((f) => ({ ...f, condition: e.target.value }))}

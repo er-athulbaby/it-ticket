@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { query, queryOne } from '@/lib/db';
+import { logAudit } from '@/lib/audit';
 
 export async function GET(req: NextRequest) {
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
@@ -17,9 +18,18 @@ export async function POST(req: NextRequest) {
   const { name, email } = await req.json();
   if (!name?.trim()) return NextResponse.json({ error: 'Name is required' }, { status: 400 });
 
-  const association = await queryOne(
+  const association = await queryOne<{ id: number; name: string }>(
     'INSERT INTO associations (name, email) VALUES ($1, $2) RETURNING *',
     [name.trim(), email?.trim() || null]
   );
+
+  if (association) {
+    const rawId = (token.id as string) || '';
+    logAudit({
+      entityType: 'association', entityId: association.id, entityLabel: association.name, action: 'create',
+      adminId: rawId ? parseInt(rawId.replace('admin_', '')) || null : null, adminName: (token.name as string) || null,
+    });
+  }
+
   return NextResponse.json(association, { status: 201 });
 }

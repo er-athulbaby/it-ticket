@@ -180,3 +180,55 @@ export async function sendReminderEmail(tickets: ReminderTicket[]) {
     `,
   });
 }
+
+interface ExpiringLicense {
+  name: string;
+  vendor: string | null;
+  expiry_date: string;
+  days_left: number;
+}
+
+export async function sendLicenseExpiryEmail(licenses: ExpiringLicense[]) {
+  const s = await getSmtpSettings();
+  if (!s.smtp_user || !s.smtp_pass || !s.notification_email) return;
+
+  const transporter = createTransport(s);
+  const company = s.company_name || 'HelpDesk';
+
+  const rows = licenses.map((l) => `
+    <tr>
+      <td style="padding:8px 10px;border-bottom:1px solid #f1f5f9;font-size:13px;color:#1e293b;">${l.name}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #f1f5f9;font-size:13px;color:#64748b;">${l.vendor || '—'}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #f1f5f9;font-size:13px;color:#1e293b;">${new Date(l.expiry_date).toLocaleDateString()}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #f1f5f9;font-size:13px;color:#b91c1c;font-weight:600;">${l.days_left} days</td>
+    </tr>
+  `).join('');
+
+  await transporter.sendMail({
+    from: `"${company}" <${s.smtp_user}>`,
+    to: s.notification_email,
+    subject: `[${company}] License Expiry Reminder: ${licenses.length} license${licenses.length > 1 ? 's' : ''} expiring soon`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;">
+        <div style="background:#dc2626;padding:20px 24px;border-radius:8px 8px 0 0;">
+          <h2 style="color:white;margin:0;font-size:18px;">${company} — License Expiry Reminder</h2>
+        </div>
+        <div style="border:1px solid #e2e8f0;border-top:none;padding:24px;border-radius:0 0 8px 8px;">
+          <p style="margin:0 0 16px;font-size:14px;color:#374151;">The following <strong>${licenses.length} license${licenses.length > 1 ? 's' : ''}</strong> are expiring soon:</p>
+          <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;">
+            <thead>
+              <tr style="background:#f8fafc;">
+                <th style="padding:8px 10px;text-align:left;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;">License</th>
+                <th style="padding:8px 10px;text-align:left;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;">Vendor</th>
+                <th style="padding:8px 10px;text-align:left;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;">Expiry</th>
+                <th style="padding:8px 10px;text-align:left;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;">Days Left</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+          <p style="margin-top:20px;font-size:13px;color:#64748b;">Login to your HelpDesk to renew or update these licenses.</p>
+        </div>
+      </div>
+    `,
+  });
+}

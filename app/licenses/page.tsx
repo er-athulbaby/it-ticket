@@ -1,13 +1,17 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import AppLayout from '@/components/layout/AppLayout';
 
 interface License {
-  id: number; name: string; vendor: string | null; product: string | null;
+  id: number; name: string; vendor: string | null; software_type: string | null;
   license_key: string | null; seats: number | null;
   purchase_date: string | null; expiry_date: string | null; notes: string | null;
+  remind_90: boolean; remind_60: boolean; remind_30: boolean;
 }
+
+const SOFTWARE_TYPES = ['Operating System', 'Productivity Suite', 'Security/Antivirus', 'Design/Creative', 'Database', 'Cloud/SaaS', 'Development Tools', 'Communication/Collaboration', 'Other'];
 
 function expiryStatus(expiry: string | null): { label: string; cls: string } {
   if (!expiry) return { label: 'No Expiry', cls: 'bg-slate-100 text-slate-500' };
@@ -17,7 +21,7 @@ function expiryStatus(expiry: string | null): { label: string; cls: string } {
   return { label: 'Active', cls: 'bg-emerald-100 text-emerald-700' };
 }
 
-const emptyForm = { name: '', vendor: '', product: '', license_key: '', seats: 1, purchase_date: '', expiry_date: '', notes: '' };
+const emptyForm = { name: '', vendor: '', software_type: '', license_key: '', seats: 1, purchase_date: '', expiry_date: '', remind_90: false, remind_60: false, remind_30: false, notes: '' };
 
 export default function LicensesPage() {
   const [licenses, setLicenses] = useState<License[]>([]);
@@ -39,7 +43,11 @@ export default function LicensesPage() {
   function openNew() { setEditing(null); setForm(emptyForm); setShowForm(true); }
   function openEdit(l: License) {
     setEditing(l);
-    setForm({ name: l.name, vendor: l.vendor || '', product: l.product || '', license_key: l.license_key || '', seats: l.seats || 1, purchase_date: l.purchase_date?.slice(0,10) || '', expiry_date: l.expiry_date?.slice(0,10) || '', notes: l.notes || '' });
+    setForm({
+      name: l.name, vendor: l.vendor || '', software_type: l.software_type || '', license_key: l.license_key || '',
+      seats: l.seats || 1, purchase_date: l.purchase_date?.slice(0,10) || '', expiry_date: l.expiry_date?.slice(0,10) || '',
+      remind_90: l.remind_90, remind_60: l.remind_60, remind_30: l.remind_30, notes: l.notes || '',
+    });
     setShowForm(true);
   }
 
@@ -102,8 +110,8 @@ export default function LicensesPage() {
                     return (
                       <tr key={l.id} className="hover:bg-slate-50">
                         <td className="px-5 py-3.5">
-                          <div className="font-medium text-slate-900">{l.name}</div>
-                          <div className="text-xs text-slate-400">{[l.vendor, l.product].filter(Boolean).join(' · ') || '—'}</div>
+                          <Link href={`/licenses/${l.id}`} className="font-medium text-slate-900 hover:text-indigo-600">{l.name}</Link>
+                          <div className="text-xs text-slate-400">{[l.vendor, l.software_type].filter(Boolean).join(' · ') || '—'}</div>
                           {l.license_key && (
                             <div className="text-xs mt-1 flex items-center gap-1">
                               <span className="font-mono text-slate-500">{showKey === l.id ? l.license_key : '••••••••••••'}</span>
@@ -116,6 +124,7 @@ export default function LicensesPage() {
                         <td className="px-4 py-3.5"><span className={`text-xs px-2 py-0.5 rounded-full font-medium ${status.cls}`}>{status.label}</span></td>
                         <td className="px-4 py-3.5">
                           <div className="flex gap-3 justify-end">
+                            <Link href={`/licenses/${l.id}`} className="text-sm text-slate-500 hover:text-slate-700 font-medium">Assign</Link>
                             <button onClick={() => openEdit(l)} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">Edit</button>
                             <button onClick={() => remove(l.id)} className="text-sm text-red-500 hover:text-red-700 font-medium">Delete</button>
                           </div>
@@ -140,13 +149,19 @@ export default function LicensesPage() {
                     className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  {[{k:'vendor',l:'Vendor',ph:'e.g. Microsoft'},{k:'product',l:'Product',ph:'e.g. Office 365'}].map(({k,l,ph}) => (
-                    <div key={k}>
-                      <label className="block text-sm font-medium text-slate-700 mb-1.5">{l}</label>
-                      <input type="text" value={(form as Record<string,unknown>)[k] as string} onChange={(e) => setForm(f => ({ ...f, [k]: e.target.value }))} placeholder={ph}
-                        className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                    </div>
-                  ))}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Vendor</label>
+                    <input type="text" value={form.vendor} onChange={(e) => setForm(f => ({ ...f, vendor: e.target.value }))} placeholder="e.g. Microsoft"
+                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Software Type</label>
+                    <select value={form.software_type} onChange={(e) => setForm(f => ({ ...f, software_type: e.target.value }))}
+                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+                      <option value="">Select type…</option>
+                      {SOFTWARE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1.5">Seats</label>
                     <input type="number" min="1" value={form.seats} onChange={(e) => setForm(f => ({ ...f, seats: Number(e.target.value) }))}
@@ -167,6 +182,18 @@ export default function LicensesPage() {
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">License Key</label>
                   <input type="text" value={form.license_key} onChange={(e) => setForm(f => ({ ...f, license_key: e.target.value }))} placeholder="XXXXX-XXXXX-XXXXX"
                     className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Expiry Email Reminders</label>
+                  <div className="flex gap-4">
+                    {[{k:'remind_90' as const,l:'90 days before'},{k:'remind_60' as const,l:'60 days before'},{k:'remind_30' as const,l:'30 days before'}].map(({k,l}) => (
+                      <label key={k} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                        <input type="checkbox" checked={form[k]} onChange={(e) => setForm(f => ({ ...f, [k]: e.target.checked }))}
+                          className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                        {l}
+                      </label>
+                    ))}
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">Notes</label>

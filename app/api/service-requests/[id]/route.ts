@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { query, queryOne } from '@/lib/db';
 import { sendServiceRequestReturnedEmail } from '@/lib/email';
+import { logAudit, diffFields, adminIdFromSession, adminNameFromSession } from '@/lib/audit';
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -29,12 +30,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id } = await params;
   const body = await req.json();
 
-  const existing = await queryOne<{ device_return_date: string | null; return_email_sent: boolean }>(
-    `SELECT device_return_date, return_email_sent FROM service_requests WHERE id=$1`, [id]
+  const existing = await queryOne<Record<string, unknown> & { device_return_date: string | null; return_email_sent: boolean; request_number: string }>(
+    `SELECT * FROM service_requests WHERE id=$1`, [id]
   );
+  if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const set: string[] = []; const vals: unknown[] = []; let i = 1;
   const s = (col: string, v: unknown) => { set.push(`${col}=$${i++}`); vals.push(v ?? null); };
+  const patch: Record<string, unknown> = {};
 
   const fields = [
     'staff_id','association_id','cpr_no','department','mobile_no',
@@ -42,7 +45,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     'employee_name','employee_signed_date','completed_by_name','completed_by_date',
     'device_return_name','device_return_date','received_by_name','received_by_date','device_condition',
   ];
-  fields.forEach((f) => { if (f in body) s(f, body[f] || null); });
+  fields.forEach((f) => { if (f in body) { s(f, body[f] || null); patch[f] = body[f] || null; } });
   if ('asset_details' in body) s('asset_details', JSON.stringify(body.asset_details || []));
   if ('accessories' in body) s('accessories', JSON.stringify(body.accessories || []));
 
@@ -55,6 +58,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     request_number: string; employee_name: string | null;
     device_return_date: string | null; received_by_name: string | null;
   }>(`UPDATE service_requests SET ${set.join(',')} WHERE id=$${i} RETURNING *`, vals);
+
+  const changes = diffFields(existing, patch);
+  if (Object.keys(changes).length) {
+    logAudit({
+      entityType: 'service_request', entityId: Number(id), entityLabel: existing.request_number,
+      action: 'update', changes, adminId: adminIdFromSession(session), adminName: adminNameFromSession(session),
+    });
+  }
 
   if (justReturned && row) {
     const recipient = await queryOne<{ email: string | null }>(`
@@ -82,6 +93,10 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   if ((session.user as { role?: string }).role === 'viewer') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   const { id } = await params;
+  const existing = await queryOne<{ request_number: string }>('SELECT request_number FROM service_requests WHERE id=$1', [id]);
   await query('DELETE FROM service_requests WHERE id=$1', [id]);
+
+  logAudit({ entityType: 'service_request', entityId: Number(id), entityLabel: existing?.request_number || `SR #${id}`, action: 'delete', adminId: adminIdFromSession(session), adminName: adminNameFromSession(session) });
+
   return NextResponse.json({ ok: true });
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { query, queryOne } from '@/lib/db';
 import { sendServiceRequestCreatedEmail } from '@/lib/email';
+import { logAudit } from '@/lib/audit';
 
 export async function GET() {
   const session = await auth();
@@ -59,6 +60,10 @@ export async function POST(req: NextRequest) {
   ]);
 
   if (row) {
+    logAudit({
+      entityType: 'service_request', entityId: row.id, entityLabel: row.request_number,
+      action: 'create', adminId, adminName: (session.user as { name?: string })?.name || null,
+    });
     const recipient = await queryOne<{ email: string | null }>(`
       SELECT COALESCE(s.email, assoc.email) AS email
       FROM service_requests sr

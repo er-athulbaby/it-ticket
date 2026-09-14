@@ -25,8 +25,9 @@ export default function StaffPage() {
   const [deptFilter, setDeptFilter] = useState('');
   const [assocFilter, setAssocFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [orgFilter, setOrgFilter] = useState<'boc' | 'associations' | 'all'>('boc');
   const [associations, setAssociations] = useState<AssociationOption[]>([]);
-  const [form, setForm] = useState({ name: '', department: '', email: '', password: '', mobile: '', association_id: '', ms_license: '' });
+  const [form, setForm] = useState({ name: '', department: '', email: '', password: '', mobile: '', association_id: '', ms_license: '', is_active: true });
   const [photoUploading, setPhotoUploading] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const photoRef = useRef<HTMLInputElement>(null);
@@ -45,7 +46,7 @@ export default function StaffPage() {
 
   function openNew() {
     setEditing(null);
-    setForm({ name: '', department: '', email: '', password: '', mobile: '', association_id: '', ms_license: '' });
+    setForm({ name: '', department: '', email: '', password: '', mobile: '', association_id: '', ms_license: '', is_active: true });
     setShowForm(true);
   }
 
@@ -54,6 +55,7 @@ export default function StaffPage() {
     setForm({
       name: s.name, department: s.department || '', email: s.email || '', password: '',
       mobile: s.mobile || '', association_id: s.association_id ? String(s.association_id) : '', ms_license: s.ms_license || '',
+      is_active: s.is_active,
     });
     setShowForm(true);
   }
@@ -71,7 +73,7 @@ export default function StaffPage() {
     };
     if (editing) {
       payload.id = editing.id;
-      payload.is_active = editing.is_active;
+      payload.is_active = form.is_active;
       await fetch('/api/staff', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     } else {
       await fetch('/api/staff', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
@@ -143,7 +145,8 @@ export default function StaffPage() {
     const matchesDept = !deptFilter || s.department === deptFilter;
     const matchesAssoc = !assocFilter || String(s.association_id) === assocFilter;
     const matchesStatus = !statusFilter || (statusFilter === 'active' ? s.is_active : !s.is_active);
-    return matchesSearch && matchesDept && matchesAssoc && matchesStatus;
+    const matchesOrg = orgFilter === 'all' || (orgFilter === 'boc' ? !s.association_id : !!s.association_id);
+    return matchesSearch && matchesDept && matchesAssoc && matchesStatus && matchesOrg;
   });
 
   return (
@@ -224,6 +227,14 @@ export default function StaffPage() {
                   {editing?.staff_code && <p className="text-xs text-slate-400 mt-1">Staff ID: <span className="font-mono">{editing.staff_code}</span></p>}
                 </div>
 
+                {editing && (
+                  <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                    <input type="checkbox" checked={form.is_active} onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.checked }))}
+                      className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                    Active (uncheck to deactivate this staff member)
+                  </label>
+                )}
+
                 <div className="border-t border-slate-100 pt-4 space-y-3">
                   <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">Portal Login (optional)</p>
                   <div>
@@ -252,6 +263,16 @@ export default function StaffPage() {
             </div>
           </div>
         )}
+
+        {/* Org toggle */}
+        <div className="flex gap-2">
+          {[{v:'boc',l:'BOC Staff'},{v:'associations',l:'Associations'},{v:'all',l:'All'}].map(({v,l}) => (
+            <button key={v} onClick={() => setOrgFilter(v as 'boc' | 'associations' | 'all')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${orgFilter === v ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-300 text-slate-600 bg-white hover:bg-slate-50'}`}>
+              {l}
+            </button>
+          ))}
+        </div>
 
         {/* Filters */}
         <div className="flex gap-3 flex-wrap">

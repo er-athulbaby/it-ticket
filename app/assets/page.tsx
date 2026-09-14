@@ -21,8 +21,8 @@ const CONDITION_STYLES: Record<string, string> = {
 
 interface Asset {
   id: number; asset_tag: string | null;
-  make: string | null; model: string | null; serial_no: string | null;
-  fru_part_no: string | null; condition: string;
+  make: string | null; vendor: string | null; model: string | null; serial_no: string | null;
+  fru_part_no: string | null; condition: string; unit_price: number | null;
   purchase_date: string | null; warranty_expiry: string | null;
   notes: string | null; created_at: string; category_id: number | null;
   category_name: string | null; category_color: string | null;
@@ -31,8 +31,8 @@ interface Asset {
 }
 
 const emptyForm = {
-  category_id: '', asset_tag: '', make: '', model: '',
-  serial_no: '', fru_part_no: '', condition: 'good',
+  category_id: '', asset_tag: '', make: '', vendor: '', model: '',
+  serial_no: '', fru_part_no: '', condition: 'good', unit_price: '',
   purchase_date: '', warranty_expiry: '', notes: '',
 };
 
@@ -306,6 +306,19 @@ export default function AssetsPage() {
                     <label className="block text-sm font-medium text-slate-700 mb-1.5">FRU / Part No.</label>
                     <input type="text" value={form.fru_part_no}
                       onChange={(e) => setForm((f) => ({ ...f, fru_part_no: e.target.value }))}
+                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Vendor / Supplier <span className="text-slate-400 font-normal">(optional)</span></label>
+                    <input type="text" value={form.vendor} onChange={(e) => setForm((f) => ({ ...f, vendor: e.target.value }))}
+                      placeholder="e.g. Bahrain IT Supplies Co." list="vendor-list"
+                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                    <datalist id="vendor-list">{Array.from(new Set(assets.map((a) => a.vendor).filter(Boolean))).map((v) => <option key={v} value={v as string} />)}</datalist>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Unit Price <span className="text-slate-400 font-normal">(optional)</span></label>
+                    <input type="number" step="0.01" min="0" value={form.unit_price} onChange={(e) => setForm((f) => ({ ...f, unit_price: e.target.value }))}
+                      placeholder="0.00"
                       className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
                   </div>
                   <div>

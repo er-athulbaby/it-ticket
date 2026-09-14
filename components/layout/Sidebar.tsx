@@ -25,6 +25,7 @@ const ALL_NAV: NavItem[] = [
   { href: '/licenses', label: 'Licenses', icon: '🔑', viewerOk: false },
   { href: '/service-requests', label: 'Service Requests', icon: '📋', viewerOk: false },
   { href: '/users', label: 'Users', icon: '👥', viewerOk: false },
+  { href: '/audit-log', label: 'Audit Log', icon: '📜', viewerOk: false },
   { href: '/settings', label: 'Settings', icon: '⚙️', viewerOk: false },
 ];
 

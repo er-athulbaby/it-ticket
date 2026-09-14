@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { query, queryOne } from '@/lib/db';
+import { logAudit, diffFields, adminIdFromSession, adminNameFromSession } from '@/lib/audit';
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -49,7 +50,13 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     ORDER BY aa.created_at DESC
   `, [id]);
 
-  return NextResponse.json({ ...asset, history });
+  const auditHistory = await query(`
+    SELECT id, action, changes, admin_name, created_at FROM audit_log
+    WHERE entity_type = 'asset' AND entity_id = $1
+    ORDER BY created_at DESC
+  `, [id]);
+
+  return NextResponse.json({ ...asset, history, auditHistory });
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -60,32 +67,46 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id } = await params;
   const body = await req.json();
 
+  const before = await queryOne<Record<string, unknown>>('SELECT * FROM assets WHERE id = $1', [id]);
+  if (!before) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
   const setClauses: string[] = [];
   const values: unknown[] = [];
   let idx = 1;
 
   const set = (col: string, val: unknown) => { setClauses.push(`${col} = $${idx++}`); values.push(val ?? null); };
+  const patch: Record<string, unknown> = {};
 
-  if ('asset_tag' in body) set('asset_tag', body.asset_tag?.trim() || null);
-  if ('make' in body) set('make', body.make?.trim() || null);
-  if ('model' in body) set('model', body.model?.trim() || null);
-  if ('serial_no' in body) set('serial_no', body.serial_no?.trim() || null);
-  if ('fru_part_no' in body) set('fru_part_no', body.fru_part_no?.trim() || null);
-  if ('condition' in body) set('condition', body.condition);
-  if ('purchase_date' in body) set('purchase_date', body.purchase_date || null);
-  if ('warranty_expiry' in body) set('warranty_expiry', body.warranty_expiry || null);
-  if ('notes' in body) set('notes', body.notes?.trim() || null);
-  if ('category_id' in body && body.category_id) set('category_id', Number(body.category_id));
+  if ('asset_tag' in body) { const v = body.asset_tag?.trim() || null; set('asset_tag', v); patch.asset_tag = v; }
+  if ('make' in body) { const v = body.make?.trim() || null; set('make', v); patch.make = v; }
+  if ('vendor' in body) { const v = body.vendor?.trim() || null; set('vendor', v); patch.vendor = v; }
+  if ('model' in body) { const v = body.model?.trim() || null; set('model', v); patch.model = v; }
+  if ('serial_no' in body) { const v = body.serial_no?.trim() || null; set('serial_no', v); patch.serial_no = v; }
+  if ('fru_part_no' in body) { const v = body.fru_part_no?.trim() || null; set('fru_part_no', v); patch.fru_part_no = v; }
+  if ('condition' in body) { set('condition', body.condition); patch.condition = body.condition; }
+  if ('purchase_date' in body) { set('purchase_date', body.purchase_date || null); patch.purchase_date = body.purchase_date || null; }
+  if ('warranty_expiry' in body) { set('warranty_expiry', body.warranty_expiry || null); patch.warranty_expiry = body.warranty_expiry || null; }
+  if ('unit_price' in body) { set('unit_price', body.unit_price || null); patch.unit_price = body.unit_price || null; }
+  if ('notes' in body) { const v = body.notes?.trim() || null; set('notes', v); patch.notes = v; }
+  if ('category_id' in body && body.category_id) { set('category_id', Number(body.category_id)); patch.category_id = Number(body.category_id); }
 
   if (!setClauses.length) return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
 
   setClauses.push(`updated_at = NOW()`);
   values.push(id);
 
-  const asset = await queryOne(
+  const asset = await queryOne<{ id: number; asset_tag: string | null }>(
     `UPDATE assets SET ${setClauses.join(', ')} WHERE id = $${idx} RETURNING *`,
     values
   );
+
+  const changes = diffFields(before, patch);
+  if (Object.keys(changes).length) {
+    logAudit({
+      entityType: 'asset', entityId: Number(id), entityLabel: asset?.asset_tag || `Asset #${id}`,
+      action: 'update', changes, adminId: adminIdFromSession(session), adminName: adminNameFromSession(session),
+    });
+  }
 
   return NextResponse.json(asset);
 }
@@ -96,6 +117,13 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   if ((session.user as { role?: string }).role === 'viewer') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const { id } = await params;
+  const existing = await queryOne<{ asset_tag: string | null }>('SELECT asset_tag FROM assets WHERE id = $1', [id]);
   await query('DELETE FROM assets WHERE id = $1', [id]);
+
+  logAudit({
+    entityType: 'asset', entityId: Number(id), entityLabel: existing?.asset_tag || `Asset #${id}`,
+    action: 'delete', adminId: adminIdFromSession(session), adminName: adminNameFromSession(session),
+  });
+
   return NextResponse.json({ ok: true });
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { query, queryOne } from '@/lib/db';
+import { logAudit, diffFields, adminIdFromSession, adminNameFromSession } from '@/lib/audit';
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -58,8 +59,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id } = await params;
   const body = await req.json();
 
-  const existing = await queryOne<{ status: string; priority: string; assigned_to: number | null }>(
-    'SELECT status, priority, assigned_to FROM tickets WHERE id = $1', [id]
+  const existing = await queryOne<Record<string, unknown> & { status: string; priority: string; assigned_to: number | null; ticket_number: string }>(
+    'SELECT * FROM tickets WHERE id = $1', [id]
   );
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
@@ -67,8 +68,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const setClauses: string[] = [];
   const values: unknown[] = [];
   let idx = 1;
+  const patch: Record<string, unknown> = {};
 
-  const set = (col: string, val: unknown) => { setClauses.push(`${col} = $${idx++}`); values.push(val ?? null); };
+  const set = (col: string, val: unknown) => { setClauses.push(`${col} = $${idx++}`); values.push(val ?? null); patch[col] = val ?? null; };
 
   if ('title' in body) set('title', body.title);
   if ('description' in body) set('description', body.description);
@@ -110,6 +112,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     `, [id, adminId, String(body.assigned_to)]);
   }
 
+  const changes = diffFields(existing, patch);
+  if (Object.keys(changes).length) {
+    logAudit({
+      entityType: 'ticket', entityId: Number(id), entityLabel: existing.ticket_number,
+      action: 'update', changes, adminId, adminName: adminNameFromSession(session),
+    });
+  }
+
   return NextResponse.json(updated);
 }
 
@@ -119,6 +129,10 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   if ((session.user as { role?: string }).role === 'viewer') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const { id } = await params;
+  const existing = await queryOne<{ ticket_number: string }>('SELECT ticket_number FROM tickets WHERE id = $1', [id]);
   await query('DELETE FROM tickets WHERE id = $1', [id]);
+
+  logAudit({ entityType: 'ticket', entityId: Number(id), entityLabel: existing?.ticket_number || `Ticket #${id}`, action: 'delete', adminId: adminIdFromSession(session), adminName: adminNameFromSession(session) });
+
   return NextResponse.json({ success: true });
 }
