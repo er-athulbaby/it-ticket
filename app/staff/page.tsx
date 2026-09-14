@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import AppLayout from '@/components/layout/AppLayout';
 
 interface Staff {
@@ -21,6 +22,9 @@ export default function StaffPage() {
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ name: string; status: string }[] | null>(null);
   const [search, setSearch] = useState('');
+  const [deptFilter, setDeptFilter] = useState('');
+  const [assocFilter, setAssocFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [associations, setAssociations] = useState<AssociationOption[]>([]);
   const [form, setForm] = useState({ name: '', department: '', email: '', password: '', mobile: '', association_id: '', ms_license: '' });
   const [photoUploading, setPhotoUploading] = useState<number | null>(null);
@@ -127,19 +131,29 @@ export default function StaffPage() {
     XLSX.writeFile(wb, 'staff-import-template.xlsx');
   }
 
-  const filtered = staff.filter((s) =>
-    s.name.toLowerCase().includes(search.toLowerCase()) ||
-    (s.department || '').toLowerCase().includes(search.toLowerCase()) ||
-    (s.email || '').toLowerCase().includes(search.toLowerCase())
-  );
+  const departments = [...new Set(staff.map((s) => s.department).filter(Boolean))].sort() as string[];
 
-  const departments = [...new Set(staff.map((s) => s.department).filter(Boolean))].sort();
+  const filtered = staff.filter((s) => {
+    const q = search.toLowerCase();
+    const matchesSearch = !q ||
+      s.name.toLowerCase().includes(q) ||
+      (s.department || '').toLowerCase().includes(q) ||
+      (s.email || '').toLowerCase().includes(q) ||
+      (s.staff_code || '').toLowerCase().includes(q);
+    const matchesDept = !deptFilter || s.department === deptFilter;
+    const matchesAssoc = !assocFilter || String(s.association_id) === assocFilter;
+    const matchesStatus = !statusFilter || (statusFilter === 'active' ? s.is_active : !s.is_active);
+    return matchesSearch && matchesDept && matchesAssoc && matchesStatus;
+  });
 
   return (
     <AppLayout>
-      <div className="max-w-4xl mx-auto space-y-5">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-slate-900">Staff</h1>
+      <div className="max-w-6xl mx-auto space-y-5">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Staff</h1>
+            <p className="text-sm text-slate-500 mt-0.5">{filtered.length} of {staff.length} staff</p>
+          </div>
           <div className="flex gap-2">
             <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleImport} className="hidden" id="staff-import" />
             <label htmlFor="staff-import" className="cursor-pointer border border-slate-300 text-slate-700 text-sm font-medium px-3 py-2 rounded-lg hover:bg-slate-50 transition-colors">
@@ -188,7 +202,7 @@ export default function StaffPage() {
                   <input type="text" value={form.department} onChange={(e) => setForm((f) => ({ ...f, department: e.target.value }))}
                     className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     placeholder="e.g. IT, HR, Finance" list="dept-list" />
-                  <datalist id="dept-list">{departments.map((d) => <option key={d} value={d!} />)}</datalist>
+                  <datalist id="dept-list">{departments.map((d) => <option key={d} value={d} />)}</datalist>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">Association / Federation</label>
@@ -239,11 +253,29 @@ export default function StaffPage() {
           </div>
         )}
 
-        {/* Search */}
-        <input type="search" placeholder="Search by name, department, or email…" value={search} onChange={(e) => setSearch(e.target.value)}
-          className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white" />
+        {/* Filters */}
+        <div className="flex gap-3 flex-wrap">
+          <input type="search" placeholder="Search by name, department, email, staff ID…" value={search} onChange={(e) => setSearch(e.target.value)}
+            className="flex-1 min-w-48 px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white" />
+          <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}
+            className="px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+            <option value="">All departments</option>
+            {departments.map((d) => <option key={d} value={d}>{d}</option>)}
+          </select>
+          <select value={assocFilter} onChange={(e) => setAssocFilter(e.target.value)}
+            className="px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+            <option value="">All associations</option>
+            {associations.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+          </select>
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+            <option value="">All statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
 
-        {/* List */}
+        {/* Table */}
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
           {loading ? (
             <div className="flex items-center justify-center h-48 text-slate-400">Loading…</div>
@@ -253,57 +285,71 @@ export default function StaffPage() {
               <div>{staff.length === 0 ? 'No staff added yet' : 'No results found'}</div>
             </div>
           ) : (
-            <div className="divide-y divide-slate-100">
-              {filtered.map((s) => (
-                <div key={s.id} className="flex items-center gap-4 px-5 py-3.5">
-                  {/* Avatar with photo upload */}
-                  <div className="relative flex-shrink-0 group cursor-pointer" onClick={() => triggerPhotoUpload(s.id)}>
-                    {s.photo_filename ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={`/api/profile/photo?staffId=${s.id}`} alt={s.name}
-                        className="w-10 h-10 rounded-full object-cover border border-slate-200" />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-semibold text-sm">
-                        {s.name.charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                    <div className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                      {photoUploading === s.id ? (
-                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <span className="text-white text-xs">📷</span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium text-slate-900">{s.name}</span>
-                      {s.staff_code && <span className="text-xs font-mono text-slate-400">{s.staff_code}</span>}
-                      {s.email && (
-                        <span className="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-medium">Portal</span>
-                      )}
-                      {s.association_name && (
-                        <span className="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full font-medium">{s.association_name}</span>
-                      )}
-                    </div>
-                    <div className="text-sm text-slate-500">
-                      {[s.department, s.email, s.mobile].filter(Boolean).join(' · ') || '—'}
-                    </div>
-                  </div>
-                  <div className="flex gap-3 flex-shrink-0">
-                    <button onClick={() => openEdit(s)} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">Edit</button>
-                    <button onClick={() => remove(s.id)} className="text-sm text-red-500 hover:text-red-700 font-medium">Delete</button>
-                  </div>
-                </div>
-              ))}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50">
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Name</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Staff ID</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Department / Association</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Email</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Mobile</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+                    <th className="px-4 py-3"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filtered.map((s) => (
+                    <tr key={s.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="relative flex-shrink-0 group cursor-pointer" onClick={(e) => { e.stopPropagation(); triggerPhotoUpload(s.id); }}>
+                            {s.photo_filename ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={`/api/profile/photo?staffId=${s.id}`} alt={s.name} className="w-8 h-8 rounded-full object-cover border border-slate-200" />
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-semibold text-xs">
+                                {s.name.charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                            <div className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                              {photoUploading === s.id ? <div className="w-2.5 h-2.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <span className="text-white text-[10px]">📷</span>}
+                            </div>
+                          </div>
+                          <Link href={`/staff/${s.id}`} className="font-medium text-slate-900 hover:text-indigo-600">{s.name}</Link>
+                          {s.email && <span className="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-medium">Portal</span>}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs text-slate-500">{s.staff_code || '—'}</td>
+                      <td className="px-4 py-3 text-slate-600">
+                        {s.department || '—'}
+                        {s.association_name && <span className="block text-xs text-indigo-600">{s.association_name}</span>}
+                      </td>
+                      <td className="px-4 py-3 text-slate-600 text-xs">{s.email || '—'}</td>
+                      <td className="px-4 py-3 text-slate-600 text-xs">{s.mobile || '—'}</td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${s.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                          {s.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex gap-3 justify-end">
+                          <Link href={`/staff/${s.id}`} className="text-sm text-slate-500 hover:text-slate-700 font-medium">View</Link>
+                          <button onClick={() => openEdit(s)} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">Edit</button>
+                          <button onClick={() => remove(s.id)} className="text-sm text-red-500 hover:text-red-700 font-medium">Delete</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
 
         <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 text-sm text-indigo-800 space-y-1">
           <p><strong>Excel import columns:</strong> <code>name</code> (required), <code>department</code>, <code>email</code>, <code>password</code> — leave email/password blank for staff without portal access.</p>
-          <p><strong>Tip:</strong> Click on a staff avatar to upload their photo. Staff with a <span className="bg-emerald-100 text-emerald-700 px-1 rounded">Portal</span> badge can log in.</p>
+          <p><strong>Tip:</strong> Click a name or &quot;View&quot; to open their full profile (assets, licenses, tickets, service requests). Click the avatar to upload a photo.</p>
         </div>
       </div>
     </AppLayout>
