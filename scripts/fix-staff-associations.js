@@ -119,6 +119,7 @@ async function main() {
   } else if (shootingDupes.length === 1) {
     shootingKeepId = shootingDupes[0].id;
   }
+  if (shootingKeepId) assocByName.set('Bahrain Shooting Federation', { id: shootingKeepId, name: 'Bahrain Shooting Federation' });
 
   // --- Step 2: create any missing "NEW:" associations ---
   for (const target of new Set(Object.values(ALIAS_MAP))) {
@@ -145,9 +146,6 @@ async function main() {
 
     let targetName = ALIAS_MAP[deptText];
     if (targetName.startsWith('NEW:')) targetName = targetName.slice(4);
-    if (targetName === 'Bahrain Shooting Federation' && shootingKeepId) {
-      // resolved via id directly below
-    }
     const targetAssoc = assocByName.get(targetName);
     if (!targetAssoc) { unmatched++; continue; }
 
