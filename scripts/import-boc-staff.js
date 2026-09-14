@@ -97,9 +97,10 @@ async function main() {
   const client = new Client({ connectionString: process.env.DATABASE_URL });
   await client.connect();
 
-  const raw = fs.readFileSync(CSV_PATH, 'utf8');
+  let raw = fs.readFileSync(CSV_PATH, 'utf8');
+  if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1); // strip UTF-8 BOM (common in Windows/Excel exports)
   const rows = parseCsv(raw);
-  const header = rows[0];
+  const header = rows[0].map((h) => h.trim());
   const dataRows = rows.slice(1);
 
   const idx = {
@@ -111,6 +112,13 @@ async function main() {
     mobile: header.indexOf('Mobile Phone'),
     phone: header.indexOf('Phone number'),
   };
+
+  if (idx.name === -1 || idx.upn === -1) {
+    console.error('Could not find expected columns in the CSV header. Header found:', header);
+    console.error('idx:', idx);
+    await client.end();
+    process.exit(1);
+  }
 
   const { rows: existingStaff } = await client.query('SELECT id, name, department, email, mobile, association_id, staff_code FROM staff');
   const { rows: existingAssoc } = await client.query('SELECT id, name FROM associations');
