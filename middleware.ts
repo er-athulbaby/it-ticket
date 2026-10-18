@@ -42,8 +42,11 @@ export async function middleware(req: NextRequest) {
   }
 
   // Only Super Admin may reach Users, Audit Log, and Settings
-  // (/api/users/photo stays available to everyone — it just serves a profile picture)
-  if (isAdmin && role !== 'superadmin' && pathname !== '/api/users/photo') {
+  // (/api/users/photo stays available to everyone — it just serves a profile picture;
+  // GET /api/users stays available to every admin — tickets need it to list possible assignees;
+  // only managing users — POST/PATCH/DELETE — and the Users admin page itself are restricted)
+  const usersListRead = pathname === '/api/users' && req.method === 'GET';
+  if (isAdmin && role !== 'superadmin' && pathname !== '/api/users/photo' && !usersListRead) {
     const restricted = SUPERADMIN_ONLY.some((p) => pathname === p || pathname.startsWith(p + '/'));
     if (restricted) {
       return pathname.startsWith('/api/')

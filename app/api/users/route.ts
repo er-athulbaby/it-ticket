@@ -11,9 +11,11 @@ function requireSuperadmin(session: { user?: unknown } | null) {
 
 export async function GET() {
   const session = await auth();
-  const denied = requireSuperadmin(session);
-  if (denied) return denied;
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  // Any logged-in admin (agent included) needs this list to populate the
+  // "Assign To" dropdown on tickets — only managing users (POST/PATCH/DELETE
+  // below) is restricted to Super Admin.
   const users = await query(`
     SELECT id, name, email, role, is_active, created_at FROM admins ORDER BY created_at DESC
   `);
