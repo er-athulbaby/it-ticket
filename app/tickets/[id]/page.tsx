@@ -256,7 +256,7 @@ export default function TicketDetailPage() {
                     <select value={editForm.requester_id} onChange={(e) => setEditForm((f) => ({ ...f, requester_id: e.target.value }))}
                       className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                       <option value="">— None —</option>
-                      {Object.entries(deptGroups).map(([dept, members]) => (
+                      {Object.entries(deptGroups).sort(([a], [b]) => (a === 'Other' ? 1 : 0) - (b === 'Other' ? 1 : 0)).map(([dept, members]) => (
                         <optgroup key={dept} label={dept}>
                           {members.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                         </optgroup>
