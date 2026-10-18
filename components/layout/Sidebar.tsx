@@ -9,7 +9,7 @@ import { getTheme } from '@/lib/themes';
 import { useState } from 'react';
 
 interface NavChild { href: string; label: string }
-interface NavItem { href: string; label: string; icon: string; viewerOk: boolean; children?: NavChild[] }
+interface NavItem { href: string; label: string; icon: string; viewerOk: boolean; superadminOnly?: boolean; children?: NavChild[] }
 
 const ALL_NAV: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: '◈', viewerOk: true },
@@ -24,9 +24,9 @@ const ALL_NAV: NavItem[] = [
   { href: '/consumables', label: 'Consumables', icon: '📦', viewerOk: false },
   { href: '/licenses', label: 'Licenses', icon: '🔑', viewerOk: false },
   { href: '/service-requests', label: 'Service Requests', icon: '📋', viewerOk: false },
-  { href: '/users', label: 'Users', icon: '👥', viewerOk: false },
-  { href: '/audit-log', label: 'Audit Log', icon: '📜', viewerOk: false },
-  { href: '/settings', label: 'Settings', icon: '⚙️', viewerOk: false },
+  { href: '/users', label: 'Users', icon: '👥', viewerOk: false, superadminOnly: true },
+  { href: '/audit-log', label: 'Audit Log', icon: '📜', viewerOk: false, superadminOnly: true },
+  { href: '/settings', label: 'Settings', icon: '⚙️', viewerOk: false, superadminOnly: true },
 ];
 
 export default function Sidebar({ onClose }: { onClose?: () => void }) {
@@ -39,8 +39,10 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
   const rawId = (session?.user as { id?: string })?.id ?? '';
   const adminId = rawId.replace('admin_', '');
   const photoUrl = adminId ? `/api/users/photo?adminId=${adminId}` : '';
-  const isViewer = (session?.user as { role?: string })?.role === 'viewer';
-  const navItems = ALL_NAV.filter((item) => !isViewer || item.viewerOk);
+  const role = (session?.user as { role?: string })?.role;
+  const isViewer = role === 'viewer';
+  const isSuperadmin = role === 'superadmin';
+  const navItems = ALL_NAV.filter((item) => (!isViewer || item.viewerOk) && (!item.superadminOnly || isSuperadmin));
 
   function isActive(item: NavItem) {
     if (item.children) return pathname === item.href || item.children.some(c => pathname === c.href || pathname.startsWith(c.href + '/'));
@@ -111,7 +113,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
 
       {/* User + Sign out */}
       <div className={cn('px-3 py-4 border-t space-y-2', theme.border)}>
-        <Link href="/settings" onClick={onClose}
+        <Link href={isSuperadmin ? '/settings' : '/dashboard'} onClick={onClose}
           className={cn('flex items-center gap-3 px-3 py-2 rounded-lg transition-colors', theme.hover)}>
           {photoUrl && !photoError ? (
             // eslint-disable-next-line @next/next/no-img-element

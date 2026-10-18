@@ -5,7 +5,7 @@ import { query } from '@/lib/db';
 export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  if ((session.user as { role?: string }).role === 'viewer') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if ((session.user as { role?: string }).role !== 'superadmin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const { searchParams } = new URL(req.url);
   const entityType = searchParams.get('entity_type') || '';

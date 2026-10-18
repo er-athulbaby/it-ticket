@@ -3,9 +3,16 @@ import { auth } from '@/lib/auth';
 import { query, queryOne } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 
+function requireSuperadmin(session: { user?: unknown } | null) {
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if ((session.user as { role?: string } | undefined)?.role !== 'superadmin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  return null;
+}
+
 export async function GET() {
   const session = await auth();
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const denied = requireSuperadmin(session);
+  if (denied) return denied;
 
   const users = await query(`
     SELECT id, name, email, role, is_active, created_at FROM admins ORDER BY created_at DESC
@@ -16,7 +23,8 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const session = await auth();
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const denied = requireSuperadmin(session);
+  if (denied) return denied;
 
   const { name, email, password, role } = await req.json();
   if (!name || !email || !password) {
@@ -37,7 +45,8 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   const session = await auth();
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const denied = requireSuperadmin(session);
+  if (denied) return denied;
 
   const { id, name, role, is_active, password } = await req.json();
   let passwordUpdate = '';
@@ -59,7 +68,8 @@ export async function PATCH(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   const session = await auth();
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const denied = requireSuperadmin(session);
+  if (denied) return denied;
 
   const { id } = await req.json();
   const rawId = session?.user?.id ?? '';

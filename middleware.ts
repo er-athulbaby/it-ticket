@@ -3,10 +3,17 @@ import { getToken } from 'next-auth/jwt';
 
 const STAFF_ALLOWED = ['/my-tickets', '/profile', '/api/staff-portal', '/api/profile', '/api/categories', '/api/staff'];
 const VIEWER_ALLOWED = ['/dashboard', '/tickets', '/api/dashboard', '/api/tickets', '/api/ticket-statuses', '/api/categories', '/api/users/photo', '/api/associations', '/api/assets', '/api/consumables', '/api/licenses', '/api/service-requests', '/api/asset-categories'];
-const PUBLIC = ['/login', '/api/auth', '/api/settings', '/public', '/api/public', '/api/reminders/send', '/api/licenses/check-expiry'];
+const SUPERADMIN_ONLY = ['/users', '/audit-log', '/settings', '/api/users', '/api/audit-log', '/api/settings'];
+const PUBLIC = ['/login', '/api/auth', '/public', '/api/public', '/api/reminders/send', '/api/licenses/check-expiry'];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  // /api/settings GET is public (logo/company name on the public ticket form);
+  // PATCH (and any other write) still requires auth + role checks below.
+  if (pathname === '/api/settings' && req.method === 'GET') return NextResponse.next();
+  // The logo image itself is public too (shown on the login page and public form); uploading a new one is not.
+  if (pathname === '/api/settings/logo' && req.method === 'GET') return NextResponse.next();
 
   const isPublic = PUBLIC.some((p) => pathname === p || pathname.startsWith(p + '/') || pathname.startsWith(p));
   if (isPublic) return NextResponse.next();
@@ -32,6 +39,17 @@ export async function middleware(req: NextRequest) {
   if (isViewer) {
     const allowed = VIEWER_ALLOWED.some((p) => pathname === p || pathname.startsWith(p + '/') || pathname.startsWith(p));
     if (!allowed) return NextResponse.redirect(new URL('/dashboard', req.url));
+  }
+
+  // Only Super Admin may reach Users, Audit Log, and Settings
+  // (/api/users/photo stays available to everyone — it just serves a profile picture)
+  if (isAdmin && role !== 'superadmin' && pathname !== '/api/users/photo') {
+    const restricted = SUPERADMIN_ONLY.some((p) => pathname === p || pathname.startsWith(p + '/'));
+    if (restricted) {
+      return pathname.startsWith('/api/')
+        ? NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        : NextResponse.redirect(new URL('/dashboard', req.url));
+    }
   }
 
   // Staff trying to access admin pages
