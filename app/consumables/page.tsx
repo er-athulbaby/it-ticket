@@ -158,8 +158,12 @@ export default function ConsumablesPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1.5">Category</label>
-                    <input type="text" value={form.category} onChange={(e) => setForm(f => ({ ...f, category: e.target.value }))}
-                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="e.g. Toner" />
+                    <select value={form.category} onChange={(e) => setForm(f => ({ ...f, category: e.target.value }))}
+                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+                      <option value="">Select category…</option>
+                      <option value="Toner">Toner</option>
+                      <option value="Waste Toner">Waste Toner</option>
+                    </select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1.5">Unit</label>
